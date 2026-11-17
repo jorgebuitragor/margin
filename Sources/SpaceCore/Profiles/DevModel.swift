@@ -1,31 +1,66 @@
 import Foundation
 
-/// Acción propuesta para un elemento. En la 0.3 es solo una propuesta: nada se ejecuta.
+/// Proceso que debe estar cerrado antes de actuar (se comprueba con `pgrep -f patrón`).
+public struct ProcessCheck: Codable, Sendable, Equatable {
+    public let label: String
+    public let pattern: String
+    public static let xcode = ProcessCheck(label: "Xcode", pattern: "Xcode.app/Contents/MacOS/Xcode")
+    public static let simulator = ProcessCheck(label: "Simulator", pattern: "Simulator.app/Contents/MacOS/Simulator")
+    public static let emulator = ProcessCheck(label: "el emulador de Android", pattern: "qemu-system-")
+    public static let gradle = ProcessCheck(label: "los daemons de Gradle (gradle --stop)", pattern: "GradleDaemon")
+    public static let claude = ProcessCheck(label: "Claude", pattern: "Claude.app/Contents/MacOS/Claude")
+    public static let vscode = ProcessCheck(label: "VS Code", pattern: "Visual Studio Code.app/Contents/MacOS/")
+}
+
+/// Acción propuesta para un elemento. Se ejecuta solo mediante un plan confirmado por el usuario (ver Actions/).
 public struct DevAction: Codable, Sendable, Equatable {
     public enum Kind: String, Codable, Sendable {
         /// Comando oficial de la herramienta dueña.
         case command
         /// Mover a la Papelera (cuando la herramienta no ofrece comando).
         case trash
+        /// Solo se puede hacer a mano (por ejemplo, desde la app dueña).
+        case manual
     }
     public let kind: Kind
-    /// Comando a ejecutar, o descripción de la acción de Papelera.
+    /// Texto para mostrar: el comando o la descripción de la acción.
     public let command: String
-    /// Variante de vista previa (dry-run) si la herramienta la ofrece.
+    /// Vista previa (dry-run) si la herramienta la ofrece, en texto.
     public let preview: String?
     /// Condición previa, por ejemplo «cierra la app antes».
     public let note: String?
+    /// Ejecutable (nombre de herramienta) y argumentos. Nunca se pasa por una shell.
+    public var argv: [String]? = nil
+    public var previewArgv: [String]? = nil
+    /// Rutas exactas que se moverían a la Papelera.
+    public var paths: [String] = []
+    /// Procesos que deben estar cerrados.
+    public var requiresClosed: [ProcessCheck] = []
 
-    public static func run(_ command: String, preview: String? = nil, note: String? = nil) -> DevAction {
-        DevAction(kind: .command, command: command, preview: preview, note: note)
+    public static func run(_ argv: [String], preview: [String]? = nil, note: String? = nil, closed: [ProcessCheck] = []) -> DevAction {
+        DevAction(kind: .command, command: display(argv), preview: preview.map(display), note: note, argv: argv, previewArgv: preview, paths: [], requiresClosed: closed)
     }
-    public static func trash(_ path: String, note: String? = nil) -> DevAction {
-        DevAction(kind: .trash, command: "Mover a la Papelera: \(path)", preview: nil, note: note)
+    public static func trash(_ path: String, note: String? = nil, closed: [ProcessCheck] = []) -> DevAction {
+        trash([path], label: path, note: note, closed: closed)
+    }
+    public static func trash(_ paths: [String], label: String, note: String? = nil, closed: [ProcessCheck] = []) -> DevAction {
+        DevAction(kind: .trash, command: "Mover a la Papelera: \(label)", preview: nil, note: note, argv: nil, previewArgv: nil, paths: paths, requiresClosed: closed)
+    }
+
+    static func display(_ argv: [String]) -> String {
+        argv.map { arg in arg.rangeOfCharacter(from: CharacterSet(charactersIn: " ;\"'$&|<>*?()")) == nil ? arg : "\"" + arg.replacingOccurrences(of: "\"", with: "\\\"") + "\"" }
+            .joined(separator: " ")
     }
 }
 
 public struct DevItem: Codable, Sendable, Identifiable {
     public var id: String { "\(profile):\(path ?? title)" }
+    /// Identificador corto y estable (FNV-1a de `id`) para la CLI.
+    public var shortID: String {
+        var hash: UInt32 = 2_166_136_261
+        for byte in id.utf8 { hash = (hash ^ UInt32(byte)) &* 16_777_619 }
+        return String(format: "%08x", hash)
+    }
     public let profile: String
     public let title: String
     public let path: String?
@@ -41,8 +76,8 @@ public struct DevItem: Codable, Sendable, Identifiable {
     public let regenerate: String
     public let action: DevAction?
     public let lastUsed: Date?
-    /// La 0.3 no ejecuta nada.
-    public private(set) var canDelete = false
+    /// Se puede incluir en un plan: tiene acción ejecutable y no está protegido. La ejecución exige confirmación.
+    public var canDelete: Bool { category != .protected && category != .unknown && action.map { $0.kind != .manual } == true }
 
     public init(profile: String, title: String, path: String?, bytes: Int64?, recoverable: Int64?, category: Category, reason: String, regenerate: String, action: DevAction?, lastUsed: Date? = nil) {
         self.profile = profile

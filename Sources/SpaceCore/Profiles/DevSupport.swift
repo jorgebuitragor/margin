@@ -138,6 +138,32 @@ public struct DevEnvironment: Sendable {
         return dirs.map { "\($0)/\(name)" }.first { FileManager.default.isExecutableFile(atPath: $0) }
     }
 
+    /// Ruta del ejecutable para una acción: las herramientas de Android viven en el SDK y xcrun en /usr/bin.
+    public func executable(for name: String) -> String? {
+        switch name {
+        case "sdkmanager", "avdmanager":
+            let path = self.path("Library/Android/sdk/cmdline-tools/latest/bin/\(name)")
+            return FileManager.default.isExecutableFile(atPath: path) ? path : tool(name)
+        case "xcrun": return tool("xcrun", extra: ["/usr/bin"])
+        default: return tool(name)
+        }
+    }
+
+    /// Hay un proceso cuya línea de comandos contiene el patrón (consulta de solo lectura con pgrep).
+    public func isRunning(_ check: ProcessCheck) -> Bool {
+        guard let pgrep = tool("pgrep", extra: ["/usr/bin"]) else { return false }
+        return runner.run(pgrep, ["-f", check.pattern], timeout: 10)?.status == 0
+    }
+
+    /// Ruta real (sin enlaces ni el atajo /tmp → /private/tmp), la misma forma que exige la revalidación.
+    public static func canonical(_ path: String) -> String {
+        guard let real = realpath(path, nil) else { return URL(fileURLWithPath: path).standardizedFileURL.path }
+        defer { free(real) }
+        return String(cString: real)
+    }
+
+    public var supportDirectory: String { path("Library/Application Support/GestorEspacio") }
+
     func days(since date: Date?) -> Int? {
         date.map { Int(now.timeIntervalSince($0) / 86_400) }
     }

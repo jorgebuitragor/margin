@@ -33,7 +33,7 @@ public struct ProjectIndex: Sendable {
             guard lstat(root.path, &st) == 0, seenRoots.insert([UInt64(bitPattern: Int64(st.st_dev)), UInt64(st.st_ino)]).inserted else { continue }
             // Las carpetas sincronizadas (por ejemplo Documentos con Google Drive) no se proponen para limpieza.
             if SyncDetector.provider(forDirectoryOrAncestors: root) != nil { continue }
-            index.walk(root.standardizedFileURL.path, depth: 0, repo: nil, env: env)
+            index.walk(DevEnvironment.canonical(root.path), depth: 0, repo: nil, env: env)
         }
         return index
     }

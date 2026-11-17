@@ -5,6 +5,28 @@ import Foundation
 public enum DevProfiles {
     public static let version = 1
 
+    public static let ids = ["android-sdk", "android-avd", "ios-simulators", "xcode", "project-artifacts", "js-packages", "gradle-maven", "docker", "homebrew", "node-versions", "claude-desktop", "vscode"]
+
+    /// Recalcula un solo perfil (para revalidar un plan antes de actuar).
+    public static func profile(_ id: String, _ env: DevEnvironment) -> ProfileResult? {
+        let index = ["android-sdk", "project-artifacts", "gradle-maven"].contains(id) ? ProjectIndex.build(env) : ProjectIndex()
+        switch id {
+        case "android-sdk": return androidSDK(env, index)
+        case "android-avd": return androidEmulators(env)
+        case "ios-simulators": return iosSimulators(env)
+        case "xcode": return xcode(env)
+        case "project-artifacts": return projectArtifacts(env, index)
+        case "js-packages": return jsPackages(env)
+        case "gradle-maven": return gradleMaven(env, index)
+        case "docker": return docker(env)
+        case "homebrew": return homebrew(env)
+        case "node-versions": return nodeVersions(env)
+        case "claude-desktop": return claudeDesktop(env)
+        case "vscode": return vscode(env)
+        default: return nil
+        }
+    }
+
     public static func report(_ env: DevEnvironment = DevEnvironment()) -> DevReport {
         let index = ProjectIndex.build(env)
         let profiles: [ProfileResult] = [
@@ -49,7 +71,7 @@ public enum DevProfiles {
                     } else {
                         result.items.append(.measured("android-sdk", "Imagen \(api) \(tag) \(abi)", path: "\(sdk)/\(rel)", category: .lowRisk,
                             reason: "Ningún emulador de ~/.android/avd usa esta imagen.", regenerate: "Se vuelve a descargar con sdkmanager si creas un emulador con ella.",
-                            action: .run("sdkmanager --uninstall \"\(package)\"")))
+                            action: .run(["sdkmanager", "--uninstall", package])))
                     }
                 }
             }
@@ -76,7 +98,7 @@ public enum DevProfiles {
                 result.items.append(.measured(result.id, "\(label) \(version)", path: path, category: .review,
                     reason: "Ningún proyecto revisado lo pide explícitamente, pero puede usarlo uno de otra carpeta o una dependencia.",
                     regenerate: "Si un proyecto lo necesita, Gradle o sdkmanager lo vuelven a descargar.",
-                    action: .run("sdkmanager --uninstall \"\(package);\(version)\"")))
+                    action: .run(["sdkmanager", "--uninstall", "\(package);\(version)"])))
             }
         }
     }
@@ -97,14 +119,14 @@ public enum DevProfiles {
                 if snap.allocated > 50_000_000 {
                     result.items.append(.measured("android-avd", "Instantáneas de \(name)", path: snapshots, category: .lowRisk,
                         reason: "Instantáneas de arranque rápido del emulador.", regenerate: "El próximo arranque será en frío (más lento); el emulador crea una nueva al cerrarse.",
-                        action: .trash(snapshots, note: "Con el emulador apagado."), usage: snap))
+                        action: .trash(snapshots, note: "Con el emulador apagado.", closed: [.emulator]), usage: snap))
                 }
             }
             var whole = usage
             whole.exclusive -= snapshotBytes
             result.items.append(.measured("android-avd", "Emulador \(name)", path: path, category: .review,
                 reason: "Emulador con sus apps y datos instalados. \(days)", regenerate: "Borrarlo pierde lo instalado en él; se puede recrear desde Android Studio (Device Manager).",
-                action: .run("avdmanager delete avd -n \"\(name)\"", note: "Con el emulador apagado."), usage: whole))
+                action: .run(["avdmanager", "delete", "avd", "-n", name], note: "Con el emulador apagado.", closed: [.emulator]), usage: whole))
         }
         return result
     }
@@ -134,14 +156,14 @@ public enum DevProfiles {
                     }
                     result.items.append(.measured("ios-simulators", "\(name) (\(version))", path: path, category: .review,
                         reason: "Simulador disponible con sus apps y datos.", regenerate: "Borrarlo pierde lo instalado; Xcode lo recrea vacío. `erase` lo vacía sin borrarlo.",
-                        action: .run("xcrun simctl delete \(udid)", preview: nil, note: "Alternativa: xcrun simctl erase \(udid)")))
+                        action: .run(["xcrun", "simctl", "delete", udid], note: "Alternativa: xcrun simctl erase \(udid)", closed: [.simulator])))
                 }
             }
             if !unavailable.isEmpty {
                 var total = Usage()
                 for path in unavailable { let u = DiskUsage.measure(path); total.allocated += u.allocated; total.exclusive += u.exclusive }
                 result.items.append(DevItem(profile: "ios-simulators", title: "\(unavailable.count) simuladores no disponibles", path: nil, bytes: total.allocated, recoverable: total.exclusive, category: .lowRisk,
-                    reason: "Su runtime ya no está instalado: no se pueden arrancar.", regenerate: "Ninguno.", action: .run("xcrun simctl delete unavailable")))
+                    reason: "Su runtime ya no está instalado: no se pueden arrancar.", regenerate: "Ninguno.", action: .run(["xcrun", "simctl", "delete", "unavailable"])))
             }
             if let runtimes = env.runner.run(xcrun, ["simctl", "runtime", "list", "-j"], timeout: 30), runtimes.status == 0,
                let json = try? JSONSerialization.jsonObject(with: Data(runtimes.output.utf8)) as? [String: [String: Any]] {
@@ -157,7 +179,7 @@ public enum DevProfiles {
                         category: !deletable || inUse ? .protected : .review,
                         reason: !deletable ? "El sistema no permite borrarlo." : inUse ? "Usado hace \(days ?? 0) días." : "Sin uso en \(days.map { "\($0)" } ?? "?") días. Vive fuera de tu carpeta personal (lo gestiona macOS).",
                         regenerate: "Se vuelve a descargar desde Xcode › Settings › Components (varios GB).",
-                        action: deletable ? .run("xcrun simctl runtime delete \(id)") : nil, lastUsed: lastUsed))
+                        action: deletable ? .run(["xcrun", "simctl", "runtime", "delete", id], closed: [.simulator]) : nil, lastUsed: lastUsed))
                 }
             }
         } else {
@@ -166,7 +188,7 @@ public enum DevProfiles {
         let caches = "\(base)/Caches"
         if env.isDirectory(caches), DiskUsage.measure(caches).allocated > 10_000_000 {
             result.items.append(.measured("ios-simulators", "Cachés de simuladores", path: caches, category: .lowRisk,
-                reason: "Cachés (por ejemplo, de dyld) que CoreSimulator regenera.", regenerate: "El primer arranque de cada simulador será más lento.", action: .trash(caches, note: "Con los simuladores apagados.")))
+                reason: "Cachés (por ejemplo, de dyld) que CoreSimulator regenera.", regenerate: "El primer arranque de cada simulador será más lento.", action: .trash(caches, note: "Con los simuladores apagados.", closed: [.simulator])))
         }
         return result
     }
@@ -180,7 +202,7 @@ public enum DevProfiles {
             let u = DiskUsage.measure(derived)
             if u.allocated > 1_000_000 {
                 result.items.append(.measured("xcode", "DerivedData", path: derived, category: .lowRisk, reason: "Productos intermedios de compilación e índices.",
-                    regenerate: "Xcode lo regenera; la siguiente compilación e indexado serán más lentos.", action: .trash(derived, note: "Con Xcode cerrado."), usage: u))
+                    regenerate: "Xcode lo regenera; la siguiente compilación e indexado serán más lentos.", action: .trash(derived, note: "Con Xcode cerrado.", closed: [.xcode]), usage: u))
             }
         }
         let support = "\(base)/iOS DeviceSupport"
@@ -198,7 +220,7 @@ public enum DevProfiles {
         }
         let cache = env.path("Library/Caches/com.apple.dt.Xcode")
         if env.isDirectory(cache), DiskUsage.measure(cache).allocated > 10_000_000 {
-            result.items.append(.measured("xcode", "Caché de Xcode", path: cache, category: .lowRisk, reason: "Caché de la app.", regenerate: "Xcode la regenera.", action: .trash(cache, note: "Con Xcode cerrado.")))
+            result.items.append(.measured("xcode", "Caché de Xcode", path: cache, category: .lowRisk, reason: "Caché de la app.", regenerate: "Xcode la regenera.", action: .trash(cache, note: "Con Xcode cerrado.", closed: [.xcode])))
         }
         return result
     }
@@ -249,15 +271,15 @@ public enum DevProfiles {
             result.detected = true
             result.items.append(.measured("js-packages", "Store de pnpm", path: store, category: .lowRisk,
                 reason: "Paquetes descargados por pnpm. Lo recuperable estimado son los archivos que ningún node_modules enlaza.",
-                regenerate: "pnpm vuelve a descargar los paquetes que pida un proyecto.", action: .run("pnpm store prune")))
+                regenerate: "pnpm vuelve a descargar los paquetes que pida un proyecto.", action: .run(["pnpm", "store", "prune"])))
         }
         let npm = env.path(".npm/_cacache")
         if env.isDirectory(npm), DiskUsage.measure(npm).allocated > 10_000_000 {
             result.detected = true
             result.items.append(.measured("js-packages", "Caché de npm", path: npm, category: .lowRisk, reason: "Copias de paquetes descargados por npm.",
-                regenerate: "npm los vuelve a descargar al instalar.", action: .run("npm cache clean --force", preview: "npm cache verify")))
+                regenerate: "npm los vuelve a descargar al instalar.", action: .run(["npm", "cache", "clean", "--force"])))
         }
-        for (path, title, command) in [(env.path("Library/Caches/Yarn"), "Caché de Yarn", "yarn cache clean"), (env.path(".bun/install/cache"), "Caché de Bun", "bun pm cache rm")] {
+        for (path, title, command) in [(env.path("Library/Caches/Yarn"), "Caché de Yarn", ["yarn", "cache", "clean"]), (env.path(".bun/install/cache"), "Caché de Bun", ["bun", "pm", "cache", "rm"])] {
             if env.isDirectory(path), DiskUsage.measure(path).allocated > 10_000_000 {
                 result.detected = true
                 result.items.append(.measured("js-packages", title, path: path, category: .lowRisk, reason: "Paquetes descargados.", regenerate: "Se vuelven a descargar al instalar.", action: .run(command)))
@@ -279,7 +301,7 @@ public enum DevProfiles {
             } else {
                 result.items.append(.measured("gradle-maven", "Gradle \(match) (\(dist.hasSuffix("all") ? "all" : "bin"))", path: path, category: .lowRisk,
                     reason: "Ningún gradle-wrapper.properties de los proyectos revisados pide esta versión.",
-                    regenerate: "El wrapper la vuelve a descargar (unos 150 MB) si un proyecto la pide.", action: .trash(path, note: "Con los daemons detenidos: gradle --stop.")))
+                    regenerate: "El wrapper la vuelve a descargar (unos 150 MB) si un proyecto la pide.", action: .trash(path, note: "Con los daemons detenidos: gradle --stop.", closed: [.gradle])))
             }
         }
         for (sub, title, category, reason, regen) in [
@@ -289,7 +311,7 @@ public enum DevProfiles {
         ] {
             let path = "\(gradle)/\(sub)"
             if env.isDirectory(path), DiskUsage.measure(path).allocated > 10_000_000 {
-                result.items.append(.measured("gradle-maven", title, path: path, category: category, reason: reason, regenerate: regen, action: .trash(path, note: "Con los daemons detenidos: gradle --stop.")))
+                result.items.append(.measured("gradle-maven", title, path: path, category: category, reason: reason, regenerate: regen, action: .trash(path, note: "Con los daemons detenidos: gradle --stop.", closed: [.gradle])))
             }
         }
         let m2 = env.path(".m2/repository")
@@ -311,12 +333,12 @@ public enum DevProfiles {
                 let reclaimable = DevEnvironmentHelpers.parseDockerSize(obj["Reclaimable"] as? String ?? "")
                 let size = DevEnvironmentHelpers.parseDockerSize(obj["Size"] as? String ?? "")
                 guard reclaimable > 0 else { continue }
-                let (title, category, reason, command): (String, Category, String, String) = switch type {
-                case "Build Cache": ("Caché de compilación", .lowRisk, "Capas de compilación intermedias.", "docker builder prune")
-                case "Images": ("Imágenes sin usar", .review, "Imágenes que ningún contenedor usa.", "docker image prune -a")
-                case "Containers": ("Contenedores detenidos", .review, "Contenedores parados; pueden tener datos que no están en volúmenes.", "docker container prune")
-                case "Local Volumes": ("Volúmenes sin usar", .review, "Volúmenes sin contenedor: suelen ser datos (bases de datos…).", "docker volume prune")
-                default: (type, .review, "Datos de Docker.", "docker system prune")
+                let (title, category, reason, command): (String, Category, String, [String]) = switch type {
+                case "Build Cache": ("Caché de compilación", .lowRisk, "Capas de compilación intermedias.", ["docker", "builder", "prune", "-f"])
+                case "Images": ("Imágenes sin usar", .review, "Imágenes que ningún contenedor usa.", ["docker", "image", "prune", "-a", "-f"])
+                case "Containers": ("Contenedores detenidos", .review, "Contenedores parados; pueden tener datos que no están en volúmenes.", ["docker", "container", "prune", "-f"])
+                case "Local Volumes": ("Volúmenes sin usar", .review, "Volúmenes sin contenedor: suelen ser datos (bases de datos…).", ["docker", "volume", "prune", "-f"])
+                default: (type, .review, "Datos de Docker.", ["docker", "system", "prune", "-f"])
                 }
                 result.items.append(DevItem(profile: "docker", title: title, path: nil, bytes: size, recoverable: reclaimable, category: category, reason: reason,
                     regenerate: type == "Local Volumes" ? "No se regeneran: es información." : "Se vuelven a descargar o construir cuando hagan falta.", action: .run(command)))
@@ -343,7 +365,7 @@ public enum DevProfiles {
         }
         if env.isDirectory(cache) {
             result.items.append(.measured("homebrew", "Descargas de Homebrew", path: cache, category: .lowRisk, reason: "Instaladores y botellas ya descargados.",
-                regenerate: "Se vuelven a descargar si reinstalas o actualizas.", action: .run("brew cleanup --prune=all", preview: "brew cleanup --prune=all --dry-run")))
+                regenerate: "Se vuelven a descargar si reinstalas o actualizas.", action: .run(["brew", "cleanup", "--prune=all"], preview: ["brew", "cleanup", "--prune=all", "--dry-run"])))
         }
         result.notes.append("`brew cleanup` también retira versiones antiguas de paquetes; su tamaño aparece en la vista previa.")
         return result
@@ -366,7 +388,7 @@ public enum DevProfiles {
             } else {
                 let note = globals.isEmpty ? "" : " Tiene herramientas globales instaladas: \(globals.joined(separator: ", ")); comprueba que estén en otra versión."
                 result.items.append(.measured("node-versions", "Node \(version)", path: path, category: .review,
-                    reason: "Hay una versión más reciente de la serie \(DevEnvironmentHelpers.major(version)).\(note)", regenerate: "Se reinstala con `nvm install \(version)`.", action: .run("nvm uninstall \(version)")))
+                    reason: "Hay una versión más reciente de la serie \(DevEnvironmentHelpers.major(version)).\(note)", regenerate: "Se reinstala con `nvm install \(version)`.", action: .trash(path, note: "Equivale a `nvm uninstall \(version)` (nvm es una función de la shell y no se puede invocar desde aquí).")))
             }
         }
         return result
@@ -382,13 +404,13 @@ public enum DevProfiles {
         if env.isDirectory(vm), DiskUsage.measure(vm).allocated > 100_000_000 {
             result.items.append(.measured("claude-desktop", "Máquina virtual de Claude", path: vm, category: .review,
                 reason: "Imagen de la máquina virtual que usa la app para ejecutar tareas en un entorno aislado. No hay comando oficial para retirarla.",
-                regenerate: "La app la vuelve a descargar (varios GB) la próxima vez que la necesite.", action: .trash(vm, note: "Con Claude cerrado.")))
+                regenerate: "La app la vuelve a descargar (varios GB) la próxima vez que la necesite.", action: .trash(vm, note: "Con Claude cerrado.", closed: [.claude])))
         }
         for (sub, title) in [("Cache", "Caché de la app"), ("Code Cache", "Caché de código de la app")] {
             let path = "\(base)/\(sub)"
             if env.isDirectory(path), DiskUsage.measure(path).allocated > 50_000_000 {
                 result.items.append(.measured("claude-desktop", title, path: path, category: .lowRisk, reason: "Caché de Electron (recursos web y código compilado).",
-                    regenerate: "La app la regenera; el primer arranque será algo más lento.", action: .trash(path, note: "Con Claude cerrado.")))
+                    regenerate: "La app la regenera; el primer arranque será algo más lento.", action: .trash(path, note: "Con Claude cerrado.", closed: [.claude])))
             }
         }
         return result
@@ -414,20 +436,21 @@ public enum DevProfiles {
             stale.formUnion(names.sorted(by: DevEnvironment.versionLess).dropLast())
         }
         var total = Usage()
-        var count = 0
+        var stalePaths: [String] = []
         for name in stale.sorted() where env.isDirectory("\(extensions)/\(name)") {
             let u = DiskUsage.measure("\(extensions)/\(name)")
-            total.allocated += u.allocated; total.exclusive += u.exclusive; count += 1
+            total.allocated += u.allocated; total.exclusive += u.exclusive; stalePaths.append("\(extensions)/\(name)")
         }
+        let count = stalePaths.count
         if count > 0 {
             result.items.append(DevItem(profile: "vscode", title: "\(count) versiones antiguas u obsoletas de extensiones", path: extensions, bytes: total.allocated, recoverable: total.exclusive, category: .lowRisk,
                 reason: "VS Code las marcó como obsoletas o existe una versión más reciente de la misma extensión.", regenerate: "Ninguno: VS Code usa la versión más reciente.",
-                action: .trash(extensions + "/<versiones antiguas>", note: "Con VS Code cerrado. VS Code también las limpia al reiniciar.")))
+                action: .trash(stalePaths, label: "\(count) carpetas de extensiones antiguas", note: "Con VS Code cerrado. VS Code también las limpia al reiniciar.", closed: [.vscode])))
         }
         for sub in ["Cache", "CachedData", "CachedExtensionVSIXs", "Code Cache"] {
             let path = env.path("Library/Application Support/Code/\(sub)")
             if env.isDirectory(path), DiskUsage.measure(path).allocated > 50_000_000 {
-                result.items.append(.measured("vscode", "VS Code · \(sub)", path: path, category: .lowRisk, reason: "Caché de la app.", regenerate: "VS Code la regenera.", action: .trash(path, note: "Con VS Code cerrado.")))
+                result.items.append(.measured("vscode", "VS Code · \(sub)", path: path, category: .lowRisk, reason: "Caché de la app.", regenerate: "VS Code la regenera.", action: .trash(path, note: "Con VS Code cerrado.", closed: [.vscode])))
             }
         }
         return result
@@ -458,8 +481,8 @@ enum DevEnvironmentHelpers {
     }
 
     static func relative(_ path: String, _ env: DevEnvironment) -> String {
-        for root in env.projectRoots where path.hasPrefix(root.standardizedFileURL.path + "/") {
-            return String(path.dropFirst(root.standardizedFileURL.path.count + 1))
+        for root in env.projectRoots.map({ DevEnvironment.canonical($0.path) }) where path.hasPrefix(root + "/") {
+            return String(path.dropFirst(root.count + 1))
         }
         return URL(fileURLWithPath: path).lastPathComponent
     }

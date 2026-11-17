@@ -19,6 +19,13 @@ public struct FileEntry: Identifiable, Codable, Sendable {
     public let modified: Date?
     public let classification: Classification
     public var name: String { URL(fileURLWithPath: path).lastPathComponent }
+    public init(path: String, bytes: Int64?, allocatedBytes: Int64?, modified: Date?, classification: Classification) {
+        self.path = path
+        self.bytes = bytes
+        self.allocatedBytes = allocatedBytes
+        self.modified = modified
+        self.classification = classification
+    }
 }
 
 /// Total de una carpeta, como lo calcularía `du`: espacio asignado, enlaces duros contados una vez,

@@ -79,3 +79,33 @@ Fecha local: 17 de noviembre de 2026. Mismo Mac.
 - La pestaña Desarrollo compila y se instala, pero no se recorrió visualmente.
 - Los comandos propuestos no se han ejecutado: su efecto real (y el espacio que liberan) se medirá en la 0.4.
 - La actividad de proyectos se basa en el último commit y en la fecha de los archivos de primer nivel; un proyecto con trabajo reciente solo en subcarpetas profundas podría verse inactivo.
+
+# Verificación · 0.4
+
+Fecha local: 17 de noviembre de 2026. Mismo Mac.
+
+## Resultados reales
+
+- `swift test`: **36 pruebas, 0 fallos**. Las 13 nuevas de acciones usan una carpeta personal sintética y una Papelera falsa (nunca la real):
+  - mover un artefacto inactivo, con registro y sin poder repetir el plan;
+  - lo protegido o activo no se puede planificar;
+  - carpeta reemplazada entre el plan y la ejecución (otro inodo): bloqueada;
+  - proyecto que volvió a estar activo: bloqueado por cambio de categoría;
+  - archivo personal modificado: bloqueado; sin cambios: va a la Papelera;
+  - ruta `/tmp` frente a `/private/tmp`: se normaliza a la ruta real;
+  - archivo dentro de un espejo de Google Drive: bloqueado;
+  - fallo parcial de la Papelera: el archivo que falla se queda en su sitio y no se borra de forma permanente;
+  - Xcode abierto: bloqueado;
+  - el comando de pnpm se lanza con argumentos fijos y su código de salida decide el estado;
+  - un plan de más de 24 h se rechaza;
+  - reglas de ruta: la carpeta personal, carpetas de primer nivel, rutas ajenas y rutas con enlaces simbólicos se rechazan.
+- **Prueba de punta a punta de la CLI** sobre una carpeta personal sintética (`ESPACIO_HOME`) con la Papelera real del sistema: `dev` mostró el id, `plan` creó el plan, `apply` con un código incorrecto canceló sin tocar nada, con el código correcto movió `node_modules` a la Papelera, el segundo `apply` se rechazó y el registro JSONL quedó escrito.
+  - La prueba **detectó un fallo real**: la CLI escribía `/tmp/…` y la regla de seguridad bloqueó el archivo por estar «fuera de la carpeta personal» (`/private/tmp/…`). Se corrigió normalizando con `realpath` en el plan; hay una prueba de regresión.
+  - Efecto secundario: quedó en la Papelera real del usuario una carpeta `node_modules` de 1,2 MB con datos aleatorios de la prueba. No se pudo retirar porque `~/.Trash` no es legible desde la terminal de Claude Code.
+- App 0.4 instalada (firma verificada); abre y cierra sin errores.
+
+## Pendientes materiales
+
+- No se ha aplicado ningún plan sobre datos reales del usuario: lo decide él.
+- Las hojas de confirmación y de resultados de la app compilan, pero no se recorrieron visualmente.
+- No se probaron con las herramientas reales los comandos `sdkmanager`, `avdmanager`, `simctl`, `docker` ni `brew` (se usó un ejecutor falso). Si uno falla, el paso queda como «falló», con la salida del comando.

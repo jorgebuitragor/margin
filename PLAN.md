@@ -76,7 +76,7 @@ Aquí aparece por primera vez la categoría **«Candidato de bajo riesgo»**, so
 
 **Aceptación:** en este Mac, el informe de perfiles identifica al menos 10 GB con su causa y su comando, sin ejecutar nada. Las pruebas cubren detección, herramientas ausentes y un proyecto activo que no se propone.
 
-### 0.4 · Acción segura (esfuerzo: alto, por integridad de datos)
+### 0.4 · Acción segura (esfuerzo: alto, por integridad de datos) — ✅ hecha el 2026-11-17, ver VERIFICACION.md
 
 - **Archivos:** HU-002 con `FileManager.trashItem`. Antes de mover, se revalida identidad (inodo y volumen), fecha de modificación, clasificación y permisos. El resultado se informa archivo por archivo y nunca se recurre al borrado permanente como alternativa.
 - **Perfiles:** cada uno muestra primero su vista previa (`--dry-run` o equivalente). Al confirmar se ejecuta el comando oficial y se guarda la salida.

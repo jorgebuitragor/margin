@@ -159,7 +159,7 @@ final class DevProfilesTests: XCTestCase {
         let items = report.profiles.flatMap(\.items)
         XCTAssertFalse(items.isEmpty)
         for item in items {
-            XCTAssertFalse(item.canDelete)
+            if item.category == .protected { XCTAssertFalse(item.canDelete, item.title) }
             XCTAssertFalse(item.reason.isEmpty)
             XCTAssertFalse(item.regenerate.isEmpty)
             if item.category == .lowRisk { XCTAssertNotNil(item.action, item.title) }

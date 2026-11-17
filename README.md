@@ -1,6 +1,6 @@
 # Gestor de espacio para Mac
 
-Estado: versión local 0.3 (2026-11-17). Núcleo, CLI e instalación verificados; recorrido visual completo pendiente. Uso personal; interfaz en español. Swift + SwiftUI, macOS 14 como mínimo declarado; validado en macOS 26 / Apple Silicon. No validado en macOS 14 ni Intel.
+Estado: versión local 0.4 (2026-11-17). Núcleo, CLI e instalación verificados; recorrido visual completo pendiente. Uso personal; interfaz en español. Swift + SwiftUI, macOS 14 como mínimo declarado; validado en macOS 26 / Apple Silicon. No validado en macOS 14 ni Intel.
 
 ## Qué incluye
 
@@ -8,11 +8,35 @@ Estado: versión local 0.3 (2026-11-17). Núcleo, CLI e instalación verificados
 - **Carpetas protegidas medidas**: `Library`, paquetes, `node_modules`, `.build`, `.git`, configuración y credenciales muestran cuánto ocupan, pero sus archivos no se listan y nunca son accionables.
 - **Detección de sincronización**: Google Drive en modo espejo (marcadores `.tmp.driveupload`/`.tmp.drivedownload`), Dropbox, `~/Library/CloudStorage` (Google Drive, OneDrive, Box…) e iCloud. Lo sincronizado se mide y queda protegido; si la carpeta analizada está dentro de una sincronizada, todo el informe es solo de medida.
 - **Archivos más grandes** fuera de zonas protegidas, con clasificación y explicación: revisar, protegido o no determinado. «Candidato de bajo riesgo» solo lo asignan los perfiles de desarrollo, nunca el análisis genérico de archivos.
-- **Perfiles de desarrollo** (`espacio dev`, pestaña Desarrollo): SDK de Android, emuladores, simuladores y runtimes de iOS, Xcode, artefactos de proyectos (`node_modules`, `.build`, `build`, `target`, `Pods`…), pnpm/npm/yarn, Gradle y Maven, Docker, Homebrew, versiones de Node (nvm), Claude Desktop y VS Code. Cada elemento trae tamaño, recuperable estimado, causa, coste de regenerarlo y el comando oficial de la herramienta dueña. Solo propone: no ejecuta nada.
+- **Perfiles de desarrollo** (`espacio dev`, pestaña Desarrollo): SDK de Android, emuladores, simuladores y runtimes de iOS, Xcode, artefactos de proyectos (`node_modules`, `.build`, `build`, `target`, `Pods`…), pnpm/npm/yarn, Gradle y Maven, Docker, Homebrew, versiones de Node (nvm), Claude Desktop y VS Code. Cada elemento trae tamaño, recuperable estimado, causa, coste de regenerarlo y el comando oficial de la herramienta dueña.
 - App nativa con pestañas Carpetas (árbol con tamaños), Archivos, Desarrollo y Memoria RAM; análisis en segundo plano con cancelación.
 - CLI `espacio` con JSON para agentes y `--text` para la terminal. No es todavía un servidor MCP.
 
-Esta versión es de solo lectura: no mueve ni borra archivos. No lee contenidos, no detecta duplicados y no descarga archivos de la nube. Los totales son espacio ocupado, no espacio recuperable.
+- **Liberar espacio con confirmación** (`espacio plan` + `espacio apply`, o «Revisar plan…» / «Mover a la Papelera…» en la app): las únicas escrituras posibles son mover a la Papelera o ejecutar el comando oficial de la herramienta dueña. **Nunca hay borrado permanente**, ni siquiera como alternativa si la Papelera falla.
+
+`scan` y `dev` no modifican nada. No se leen contenidos, no se detectan duplicados y no se descargan archivos de la nube. Los totales son espacio ocupado, no espacio recuperable.
+
+## Liberar espacio
+
+```sh
+espacio dev --text                 # cada elemento accionable muestra «id xxxxxxxx»
+espacio plan 3fa59d9b 1c2d3e4f     # crea un plan; no ejecuta nada
+espacio plan --file ~/Downloads/viejo.dmg
+espacio apply <plan>               # revalida, muestra vista previa y pide escribir el código del plan
+```
+
+Garantías de `apply` (cubiertas por pruebas):
+
+- Solo entran en un plan elementos «bajo riesgo» o «revisar» con acción; nada protegido, desconocido ni sincronizado. Los archivos sueltos deben ser «Revisar antes de borrar».
+- Se captura la identidad (volumen, inodo y, en archivos, tamaño y fecha) al planificar y se comprueba otra vez justo antes de mover: si algo cambió, el paso se bloquea.
+- El perfil se recalcula antes de actuar: un proyecto que volvió a estar activo o una imagen que ahora usa un emulador quedan bloqueados.
+- Si la app dueña está abierta (Xcode, Claude, VS Code, el emulador, daemons de Gradle…), el paso se bloquea.
+- Las rutas deben estar dentro de la carpeta personal, a dos niveles o más, sin enlaces simbólicos en el camino.
+- Los comandos se lanzan sin shell, con argumentos fijos (por ejemplo `pnpm store prune`, `xcrun simctl delete unavailable`, `docker builder prune -f`).
+- Un plan caduca a las 24 horas y no se puede aplicar dos veces.
+- Se registra cada paso en `~/Library/Application Support/GestorEspacio/acciones.jsonl` y el resultado en `planes/<id>.resultado.json`. Se informa el espacio disponible antes y después; lo que va a la Papelera no se libera hasta vaciarla.
+
+La confirmación consiste en escribir el código del plan. Un agente (Codex, Claude Code) puede crear planes, pero la decisión de aplicarlos es tuya.
 
 Al analizar la carpeta personal, macOS puede pedir permiso para acceder a datos de otras apps (por ejemplo `~/Library/Containers`). Si se deniega, esa carpeta se cuenta como ilegible y el total se marca como mínimo.
 
@@ -40,7 +64,7 @@ espacio dev --inactive-days 60 --roots ~/Developer,~/git
 
 `dev` tarda unos 30 s. Ejecuta solo consultas de lectura (`xcrun simctl list`, `xcrun simctl runtime list`, `docker system df`, `git log -1`, `pnpm store path`, `brew --cache`). «Recuperable estimado» excluye archivos con enlaces duros compartidos: por eso un `node_modules` de pnpm recupera poco por sí solo y el store de pnpm se mide por lo que ningún proyecto enlaza. Un proyecto es inactivo si no tiene commits ni cambios en sus archivos de primer nivel en 30 días (configurable); los artefactos de proyectos activos se muestran como «conservar».
 
-`scan` devuelve `totalAllocated`, `folders` (ruta, profundidad, tamaño, archivos, `protection`: `protected`/`sync`, `partial`), `entries` (archivos más grandes y carpetas protegidas con su total), `syncedBy`, incidencias y las banderas `cancelled`/`limited`. `limited` significa que se listan solo los archivos más grandes (`--max-files`, 20.000 por defecto); los totales siguen completos. Un total con `partial` o con incidencias es un mínimo. `canDelete` siempre es falso.
+`scan` devuelve `totalAllocated`, `folders` (ruta, profundidad, tamaño, archivos, `protection`: `protected`/`sync`, `partial`), `entries` (archivos más grandes y carpetas protegidas con su total), `syncedBy`, incidencias y las banderas `cancelled`/`limited`. `limited` significa que se listan solo los archivos más grandes (`--max-files`, 20.000 por defecto); los totales siguen completos. Un total con `partial` o con incidencias es un mínimo. En `scan`, `canDelete` siempre es falso: los archivos sueltos se planifican con `espacio plan --file`.
 
 Los resultados incluyen rutas y nombres. Al consultarlos desde un asistente pasan a su conversación: comparte solo el alcance que necesites. La app y la CLI no incluyen clientes de red ni un modelo.
 
@@ -60,8 +84,8 @@ Fixtures sintéticos creados y retirados por las pruebas, sin limpieza sobre arc
 - [Verificación](VERIFICACION.md).
 - [Código de interfaz](Sources/SpaceApp/App.swift), [núcleo](Sources/SpaceCore), [CLI](Sources/SpaceCLI/main.swift).
 
-Confirmados: disco y diagnóstico de RAM, uso personal, clasificación con causa. Hasta la 0.3 todo es análisis sin escritura. La integración MCP es propuesta futura (0.5), no capacidad actual.
+Confirmados: disco y diagnóstico de RAM, uso personal, clasificación con causa. Desde la 0.4 hay escritura, solo mediante planes confirmados. La integración MCP es propuesta futura (0.5), no capacidad actual.
 
 ## Siguiente incremento
 
-La 0.3 está hecha. Siguiente: 0.4, acción segura (Papelera con revalidación y ejecución de los comandos propuestos con vista previa y medición antes/después). Plan completo en [PLAN.md](PLAN.md).
+La 0.4 está hecha. Siguiente: 0.5, servidor MCP y skill `liberar-espacio` (el agente propone planes; aplicarlos sigue siendo tuyo). Plan completo en [PLAN.md](PLAN.md).

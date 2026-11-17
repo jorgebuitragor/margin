@@ -59,7 +59,7 @@ func printDev(_ report: DevReport) {
         print("■ \(profile.name) (\(profile.owner)) · bajo riesgo \(size(profile.lowRiskBytes)) · revisar \(size(profile.reviewBytes))")
         for item in profile.items.sorted(by: { ($0.recoverable ?? 0) > ($1.recoverable ?? 0) }) {
             let tag = item.category == .lowRisk ? "BAJO RIESGO" : item.category == .review ? "REVISAR" : "CONSERVAR"
-            print("  \(pad(size(item.recoverable ?? item.bytes), 10))  [\(tag)] \(item.title)")
+            print("  \(pad(size(item.recoverable ?? item.bytes), 10))  [\(tag)] \(item.title)\(item.canDelete ? "  · id \(item.shortID)" : "")")
             if item.category != .protected {
                 print("              \(item.reason)")
                 if let action = item.action {
@@ -70,6 +70,47 @@ func printDev(_ report: DevReport) {
         for note in profile.notes { print("  ℹ︎ \(note)") }
         print()
     }
+}
+
+func baseEnvironment() -> DevEnvironment {
+    // ESPACIO_HOME permite probar de punta a punta sobre una carpeta personal sintética.
+    if let home = ProcessInfo.processInfo.environment["ESPACIO_HOME"] { return DevEnvironment(home: URL(fileURLWithPath: home)) }
+    return DevEnvironment()
+}
+
+func roots(_ args: inout [String], _ env: inout DevEnvironment) {
+    if let days = intValue(&args, "--inactive-days") { env.inactiveDays = days }
+    if let index = args.firstIndex(of: "--roots") {
+        guard index + 1 < args.count else { fail("--roots necesita rutas separadas por comas.") }
+        env.projectRoots = args[index + 1].split(separator: ",").map { URL(fileURLWithPath: NSString(string: String($0)).expandingTildeInPath).standardizedFileURL }
+        args.removeSubrange(index...index + 1)
+    }
+}
+
+func printPlan(_ plan: Plan, previews: [String: String] = [:]) {
+    print("Plan \(plan.id) · \(plan.steps.count) pasos · recuperable estimado \(size(plan.recoverable))")
+    for step in plan.steps {
+        let tag = step.category == .lowRisk ? "BAJO RIESGO" : "REVISAR"
+        print("\n• [\(tag)] \(step.title)  (\(size(step.recoverable)))")
+        print("  Por qué: \(step.reason)")
+        print("  Si se retira: \(step.regenerate)")
+        if step.action.kind == .trash {
+            print("  Acción: mover a la Papelera \(step.action.paths.count == 1 ? step.action.paths[0] : "\(step.action.paths.count) rutas")")
+        } else {
+            print("  Acción: \(step.action.command)")
+        }
+        if let note = step.action.note { print("  Condición: \(note)") }
+        if let preview = previews[step.id], !preview.isEmpty {
+            print("  Vista previa:")
+            print(preview.split(separator: "\n").prefix(15).map { "    " + $0 }.joined(separator: "\n"))
+        }
+    }
+}
+
+func readConfirmation(_ code: String) -> Bool {
+    print("\nPara ejecutar, escribe el código del plan (\(code)) y pulsa Intro. Cualquier otra cosa cancela: ", terminator: "")
+    fflush(stdout)
+    return readLine()?.trimmingCharacters(in: .whitespaces) == code
 }
 
 func intValue(_ args: inout [String], _ flag: String) -> Int? {
@@ -97,18 +138,72 @@ do {
         if text { printText(report, folders: 25, files: 15) } else { try output(report) }
     case "dev":
         args.removeFirst()
-        var env = DevEnvironment()
-        if let days = intValue(&args, "--inactive-days") { env.inactiveDays = days }
-        if let index = args.firstIndex(of: "--roots") {
-            guard index + 1 < args.count else { fail("--roots necesita rutas separadas por comas.") }
-            env.projectRoots = args[index + 1].split(separator: ",").map { URL(fileURLWithPath: NSString(string: String($0)).expandingTildeInPath) }
-            args.removeSubrange(index...index + 1)
-        }
+        var env = baseEnvironment()
+        roots(&args, &env)
         let text = args.contains("--text")
         args.removeAll { $0 == "--text" }
         guard args.isEmpty else { fail("Uso: espacio dev [--text] [--inactive-days N] [--roots ruta1,ruta2]") }
         let report = DevProfiles.report(env)
         if text { printDev(report) } else { try output(report) }
+    case "plan":
+        args.removeFirst()
+        var env = baseEnvironment()
+        roots(&args, &env)
+        var files: [String] = []
+        while let index = args.firstIndex(of: "--file") {
+            guard index + 1 < args.count else { fail("--file necesita una ruta.") }
+            files.append(DevEnvironment.canonical(NSString(string: args[index + 1]).expandingTildeInPath))
+            args.removeSubrange(index...index + 1)
+        }
+        guard !args.isEmpty || !files.isEmpty else { fail("Uso: espacio plan <id> [<id>…] [--file /ruta]… — los id salen en `espacio dev --text`.") }
+        var items: [DevItem] = []
+        if !args.isEmpty {
+            print("Analizando perfiles para resolver los id…")
+            let all = DevProfiles.report(env).profiles.flatMap(\.items)
+            for id in args {
+                guard let item = all.first(where: { $0.shortID == id }) else { fail("No se encontró el id \(id) en el análisis actual.") }
+                items.append(item)
+            }
+        }
+        var entries: [FileEntry] = []
+        for path in files {
+            let url = URL(fileURLWithPath: path)
+            let values = try url.resourceValues(forKeys: [.fileSizeKey, .totalFileAllocatedSizeKey, .isRegularFileKey])
+            guard values.isRegularFile == true else { fail("Solo se aceptan archivos normales: \(path)") }
+            if let sync = SyncDetector.provider(forDirectoryOrAncestors: url.deletingLastPathComponent()) { fail("\(path) está sincronizado con \(sync.provider); no se ofrece para limpieza.") }
+            entries.append(FileEntry(path: path, bytes: values.fileSize.map(Int64.init), allocatedBytes: values.totalFileAllocatedSize.map(Int64.init), modified: nil, classification: Classifier.classify(url)))
+        }
+        let plan = try Planner.plan(devItems: items, files: entries, env: env)
+        try PlanStore.save(plan, env)
+        printPlan(plan)
+        print("\nNo se ha ejecutado nada. Para aplicarlo (pedirá confirmación): espacio apply \(plan.id)")
+    case "apply":
+        args.removeFirst()
+        guard args.count == 1 else { fail("Uso: espacio apply <plan>") }
+        let base = baseEnvironment()
+        let plan = try PlanStore.load(args[0], base)
+        if PlanStore.isApplied(plan.id, base) { throw PlanError.alreadyApplied }
+        let env = plan.environment(from: base)
+        print("Revalidando cada paso con el estado actual…")
+        var fresh: [String: ProfileResult] = [:]
+        let blocked = plan.steps.compactMap { step in Planner.blocker(step, plan: plan, env: env, freshProfiles: &fresh).map { (step.title, $0) } }
+        printPlan(plan, previews: Planner.previews(plan, env: env))
+        if !blocked.isEmpty {
+            print("\nBloqueados ahora (no se tocarán):")
+            for (title, reason) in blocked { print("  ✗ \(title): \(reason)") }
+            if blocked.count == plan.steps.count { fail("\nNingún paso se puede ejecutar.") }
+        }
+        print("\nLo que vaya a la Papelera se puede recuperar desde Finder hasta que la vacíes. Los comandos de las herramientas no se pueden deshacer.")
+        guard readConfirmation(plan.id) else { print("Cancelado. No se ha tocado nada."); exit(0) }
+        let report = try Planner.apply(plan, env: env) { result in
+            let mark = result.status == .done ? "✓" : result.status == .blocked ? "✗" : "!"
+            print("\(mark) \(result.title): \(result.message)")
+            for (path, error) in result.failures.sorted(by: { $0.key < $1.key }) { print("    \(path): \(error)") }
+            if result.status == .failed, let output = result.output, !output.isEmpty { print(output.split(separator: "\n").suffix(8).map { "    " + $0 }.joined(separator: "\n")) }
+        }
+        print("\nEspacio disponible: antes \(size(report.availableBefore)), después \(size(report.availableAfter))\(report.freedObserved.map { " (\($0 >= 0 ? "+" : "")\(formatBytes($0)))" } ?? "").")
+        if report.usedTrash { print("Lo movido a la Papelera no libera espacio hasta que la vacíes. macOS también puede tardar en reflejarlo (instantáneas locales de Time Machine).") }
+        print("Registro: \(env.supportDirectory)/acciones.jsonl")
     case "help", "--help", nil:
         print("""
         espacio status        Diagnóstico de RAM y volumen en JSON.
@@ -121,7 +216,11 @@ do {
             --inactive-days N Días sin cambios para considerar inactivo un proyecto (por defecto 30).
             --roots a,b       Carpetas de proyectos (por defecto ~/Developer, ~/git, ~/projects…).
             --text            Resumen legible en lugar de JSON.
-        Ningún comando borra nada: dev solo mide y propone.
+        espacio plan <id>… [--file /ruta]…
+                              Crea un plan con elementos de `dev` (id) o archivos revisables. No ejecuta nada.
+        espacio apply <plan>  Revalida, muestra vista previa y, si escribes el código del plan, ejecuta:
+                              mueve a la Papelera o lanza el comando oficial de la herramienta.
+        Nunca hay borrado permanente. scan y dev solo miden y proponen.
         Los totales siguen la lógica de du: espacio asignado, enlaces duros una vez, sin seguir enlaces.
         Carpetas protegidas y sincronizadas se miden, pero sus archivos no se listan ni son accionables.
         Los informes incluyen rutas: comparte solo los datos que necesites.

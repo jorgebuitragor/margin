@@ -13,6 +13,8 @@ func size(_ bytes: Int64?) -> String {
     bytes.map { formatBytes($0) } ?? "No disponible"
 }
 
+struct ReportBox: Identifiable { let report: ApplyReport; var id: String { report.planID } }
+
 /// Nodo del árbol de carpetas, construido a partir de la lista plana del informe.
 struct FolderNode: Identifiable {
     let folder: FolderTotal
@@ -87,6 +89,55 @@ final class AppModel: ObservableObject {
 
     @Published var dev: DevReport?
     @Published var devBusy = false
+
+    // Acciones (0.4): plan → confirmación → ejecución → resultado.
+    @Published var pendingPlan: Plan?
+    @Published var blockers: [String: String] = [:]
+    @Published var preparing = false
+    @Published var applying = false
+    @Published var applyReport: ApplyReport?
+    @Published var planError: String?
+
+    func prepare(devItems: [DevItem] = [], files: [FileEntry] = []) {
+        preparing = true
+        planError = nil
+        Task {
+            let outcome: Result<(Plan, [String: String]), Error> = await Task.detached(priority: .userInitiated) {
+                let env = DevEnvironment()
+                return Result {
+                    let plan = try Planner.plan(devItems: devItems, files: files, env: env)
+                    try PlanStore.save(plan, env)
+                    var fresh: [String: ProfileResult] = [:]
+                    var blocked: [String: String] = [:]
+                    for step in plan.steps { blocked[step.id] = Planner.blocker(step, plan: plan, env: env, freshProfiles: &fresh) }
+                    return (plan, blocked)
+                }
+            }.value
+            switch outcome {
+            case .success(let (plan, blocked)): pendingPlan = plan; blockers = blocked
+            case .failure(let error): planError = error.localizedDescription
+            }
+            preparing = false
+        }
+    }
+
+    func applyPending() {
+        guard let plan = pendingPlan else { return }
+        applying = true
+        Task {
+            let outcome = await Task.detached(priority: .userInitiated) {
+                Result { try Planner.apply(plan, env: plan.environment(from: DevEnvironment())) }
+            }.value
+            pendingPlan = nil
+            applying = false
+            switch outcome {
+            case .success(let report): applyReport = report
+            case .failure(let error): planError = error.localizedDescription
+            }
+            diagnostics = Diagnostics.read()
+            if dev != nil { analyzeDev() }
+        }
+    }
     func analyzeDev() {
         devBusy = true
         Task {
@@ -117,7 +168,9 @@ struct ContentView: View {
     @ObservedObject var model: AppModel
     @State private var category: SpaceCore.Category?
     @State private var search = ""
-    @State private var selected: String?
+    @State private var selected = Set<String>()
+    @State private var devChecked = Set<String>()
+    @State private var acceptReview = false
     @State private var tab = "Carpetas"
     private let accent = Color(red: 0.12, green: 0.58, blue: 0.48)
     var filtered: [FileEntry] {
@@ -125,7 +178,10 @@ struct ContentView: View {
             (category == nil || $0.classification.category == category) && (search.isEmpty || $0.path.localizedCaseInsensitiveContains(search))
         }
     }
-    var chosen: FileEntry? { model.report?.entries.first { $0.id == selected } }
+    var chosen: FileEntry? { selected.count == 1 ? model.report?.entries.first { selected.contains($0.id) } : nil }
+    var trashableSelection: [FileEntry] {
+        (model.report?.entries ?? []).filter { selected.contains($0.id) && $0.classification.category == .review && $0.bytes != nil }
+    }
     var body: some View {
         NavigationSplitView {
             VStack(alignment: .leading, spacing: 26) {
@@ -140,8 +196,8 @@ struct ContentView: View {
                     }.buttonStyle(.plain)
                 }
                 Spacer()
-                Label("Solo lectura", systemImage: "checkmark.shield").foregroundStyle(accent)
-                Text("Tus archivos permanecen intactos.\nVersión local 0.3").font(.caption).foregroundStyle(.secondary)
+                Label("Nada sin tu confirmación", systemImage: "checkmark.shield").foregroundStyle(accent)
+                Text("Solo Papelera o el comando oficial de cada herramienta; nunca borrado permanente.\nVersión local 0.4").font(.caption).foregroundStyle(.secondary)
             }.padding(20)
             .navigationSplitViewColumnWidth(220)
         } detail: {
@@ -164,6 +220,66 @@ struct ContentView: View {
             }.padding(28)
         }
         .tint(accent)
+        .sheet(item: $model.pendingPlan) { plan in confirmation(plan) }
+        .sheet(item: Binding(get: { model.applyReport.map { ReportBox(report: $0) } }, set: { if $0 == nil { model.applyReport = nil } })) { box in results(box.report) }
+        .alert("No se pudo preparar el plan", isPresented: Binding(get: { model.planError != nil }, set: { if !$0 { model.planError = nil } })) {
+            Button("Aceptar", role: .cancel) {}
+        } message: { Text(model.planError ?? "") }
+    }
+
+    func confirmation(_ plan: Plan) -> some View {
+        let runnable = plan.steps.filter { model.blockers[$0.id] == nil }
+        let hasReview = runnable.contains { $0.category == .review }
+        return VStack(alignment: .leading, spacing: 14) {
+            Text("Revisa el plan").font(.title2.bold())
+            Text("Recuperable estimado \(size(plan.recoverable)). Cada paso se vuelve a comprobar justo antes de actuar.").foregroundStyle(.secondary)
+            List(plan.steps) { step in
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Image(systemName: model.blockers[step.id] != nil ? "xmark.octagon" : step.category == .review ? "eye" : "checkmark.circle")
+                            .foregroundStyle(model.blockers[step.id] != nil ? .red : step.category == .review ? .orange : accent)
+                        Text(step.title).font(.headline)
+                        Spacer()
+                        Text(size(step.recoverable)).monospacedDigit()
+                    }
+                    Text(step.action.kind == .trash ? "Mover a la Papelera: \(step.action.paths.count == 1 ? step.action.paths[0] : "\(step.action.paths.count) rutas")" : "Ejecutar: \(step.action.command)")
+                        .font(.system(.caption, design: .monospaced)).textSelection(.enabled)
+                    Text("Si se retira: \(step.regenerate)").font(.caption).foregroundStyle(.secondary)
+                    if let note = step.action.note { Text(note).font(.caption).foregroundStyle(.orange) }
+                    if let blocker = model.blockers[step.id] { Text("No se ejecutará: \(blocker)").font(.caption).foregroundStyle(.red) }
+                }.padding(.vertical, 4)
+            }.frame(minHeight: 240)
+            Text("Lo que vaya a la Papelera se recupera desde Finder hasta que la vacíes. Los comandos de las herramientas no se pueden deshacer.").font(.caption)
+            if hasReview {
+                Toggle("Entiendo que hay elementos marcados «Revisar antes de borrar» y los he revisado", isOn: $acceptReview)
+            }
+            HStack {
+                Spacer()
+                Button("Cancelar", role: .cancel) { model.pendingPlan = nil; acceptReview = false }.keyboardShortcut(.cancelAction)
+                Button(model.applying ? "Ejecutando…" : "Ejecutar \(runnable.count) pasos", role: .destructive) { model.applyPending(); acceptReview = false; devChecked.removeAll(); selected.removeAll() }
+                    .disabled(runnable.isEmpty || model.applying || (hasReview && !acceptReview))
+            }
+        }.padding(24).frame(width: 720, height: 560)
+    }
+
+    func results(_ report: ApplyReport) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Resultado").font(.title2.bold())
+            List(report.results, id: \.stepID) { result in
+                VStack(alignment: .leading, spacing: 3) {
+                    Label("\(result.title): \(result.message)", systemImage: result.status == .done ? "checkmark.circle.fill" : result.status == .blocked ? "xmark.octagon" : "exclamationmark.triangle")
+                        .foregroundStyle(result.status == .done ? accent : result.status == .blocked ? .secondary : .orange)
+                    ForEach(result.failures.sorted(by: { $0.key < $1.key }), id: \.key) { Text("\($0.key): \($0.value)").font(.caption).foregroundStyle(.red) }
+                    if result.status == .failed, let output = result.output { Text(output).font(.system(.caption2, design: .monospaced)).lineLimit(6) }
+                }
+            }.frame(minHeight: 200)
+            Text("Espacio disponible: antes \(size(report.availableBefore)), después \(size(report.availableAfter))\(report.freedObserved.map { " (\($0 >= 0 ? "+" : "")\(formatBytes($0)))" } ?? "").")
+            if report.usedTrash { Text("Lo movido a la Papelera no libera espacio hasta que la vacíes.").foregroundStyle(.orange) }
+            HStack {
+                Spacer()
+                Button("Cerrar") { model.applyReport = nil }.keyboardShortcut(.defaultAction)
+            }
+        }.padding(24).frame(width: 640, height: 480)
     }
     var status: some View {
         HStack {
@@ -231,6 +347,9 @@ struct ContentView: View {
                         Section("\(profile.name) · \(profile.owner)") {
                             ForEach(profile.items) { item in
                                 HStack(spacing: 10) {
+                                    Toggle("", isOn: Binding(get: { devChecked.contains(item.id) }, set: { on in if on { devChecked.insert(item.id) } else { devChecked.remove(item.id) } }))
+                                        .toggleStyle(.checkbox).labelsHidden().disabled(!item.canDelete)
+                                        .accessibilityLabel("Incluir \(item.title) en el plan")
                                     Image(systemName: item.category == .lowRisk ? "checkmark.circle" : item.category == .review ? "eye" : "lock")
                                         .foregroundStyle(item.category == .lowRisk ? accent : item.category == .review ? .orange : .secondary)
                                     Text(item.title).lineLimit(1)
@@ -271,8 +390,15 @@ struct ContentView: View {
                         }
                     }.padding(16).background(accent.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
                 }
-                Text("Esta versión no ejecuta nada: copia el comando y ejecútalo tú. «Recuperable estimado» excluye archivos con enlaces duros compartidos.")
-                    .font(.caption).foregroundStyle(.secondary)
+                let checked = items.flatMap(\.items).filter { devChecked.contains($0.id) && $0.canDelete }
+                HStack {
+                    Text("Marca elementos y revisa el plan antes de ejecutar. «Recuperable estimado» excluye archivos con enlaces duros compartidos.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    if model.preparing { ProgressView().controlSize(.small) }
+                    Button("Revisar plan (\(checked.count))…", systemImage: "list.bullet.clipboard") { model.prepare(devItems: checked) }
+                        .disabled(checked.isEmpty || model.preparing || model.applying)
+                }
             } else if !model.devBusy {
                 ContentUnavailableView("Analiza tus herramientas de desarrollo", systemImage: "hammer", description: Text("Android SDK y emuladores, simuladores y Xcode, node_modules de proyectos inactivos, pnpm, Gradle, Docker, Homebrew…"))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -309,6 +435,12 @@ struct ContentView: View {
                     }.width(190)
                 }.frame(minHeight: 180)
                 if filtered.isEmpty { Text("No hay resultados para mostrar con estos filtros.").foregroundStyle(.secondary) }
+            }
+            HStack {
+                Text(selected.count > 1 ? "\(selected.count) seleccionados; solo los «Revisar antes de borrar» pueden ir a la Papelera." : "Selecciona varios con ⌘ o ⇧.").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button("Mover a la Papelera (\(trashableSelection.count))…", systemImage: "trash") { model.prepare(files: trashableSelection) }
+                    .disabled(trashableSelection.isEmpty || model.preparing || model.applying)
             }
             if let entry = chosen {
                 VStack(alignment: .leading, spacing: 8) {
