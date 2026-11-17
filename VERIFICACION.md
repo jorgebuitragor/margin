@@ -134,3 +134,26 @@ No verificado:
 - **«Elegir carpeta…»**: el selector de macOS corre en otro proceso y no se pudo controlar, por eso se usó `ESPACIO_SCAN`. El selector sí se abre.
 - **Selección múltiple en Archivos**: ⇧↓ enviado en segundo plano no amplió la selección. Puede ser una limitación de la automatización; falta comprobarlo a mano con ⌘/⇧ y clic.
 - **Detalles menores**: la ruta raíz se muestra como `/tmp/…` cuando la carpeta está en `/private/tmp`, y el panel «Por qué» deja poca altura a la tabla.
+
+# Verificación · 0.5
+
+Fecha local: 17 de noviembre de 2026. Mismo Mac.
+
+## Resultados reales
+
+- `swift test`: **43 pruebas, 0 fallos**. Las 5 nuevas del servidor MCP comprueban:
+  - el saludo inicial (versión del protocolo y capacidad de herramientas);
+  - que las notificaciones no reciben respuesta;
+  - la lista de herramientas, que no incluye ninguna que aplique, borre o mueva;
+  - los errores de JSON-RPC (método desconocido y JSON inválido);
+  - que `dev_report` seguido de `propose_cleanup` crea un plan sin tocar ningún archivo, y que `plan_result` lo da como pendiente;
+  - que se rechazan archivos protegidos e id inexistentes;
+  - el resumen compacto de `scan_folder`.
+- `espacio apply` con la entrada por tubería (sin terminal interactiva) se niega a ejecutar: «necesita una terminal interactiva».
+- `bash scripts/install-agentes.sh`: copió la skill a `~/.claude/skills/liberar-espacio` y registró el MCP `gestor-espacio` en el ámbito de usuario. `claude mcp list` → «✔ Connected».
+- **Cliente real**: `claude -p` (Claude Code 2.1.314), con permiso solo para `dev_report` y `propose_cleanup`, creó el plan `59294cb7` (store de pnpm, unos 1,72 GB recuperables) y respondió que no se había ejecutado y que el usuario debe correr `espacio apply 59294cb7`. El plan quedó guardado y no se ejecutó.
+
+## Pendientes materiales
+
+- No se probó con Codex (el comando que hay que registrar es el mismo: `~/.local/bin/espacio mcp`).
+- `scan_folder` sobre la carpeta personal tarda unos 3 minutos; un cliente MCP con un tiempo límite corto podría cortarlo.

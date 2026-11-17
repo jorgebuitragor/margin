@@ -177,9 +177,23 @@ do {
         try PlanStore.save(plan, env)
         printPlan(plan)
         print("\nNo se ha ejecutado nada. Para aplicarlo (pedirá confirmación): espacio apply \(plan.id)")
+    case "mcp":
+        // Servidor MCP por stdio. Nada se escribe en stdout salvo respuestas JSON-RPC.
+        let server = MCPServer(env: baseEnvironment())
+        while let line = readLine(strippingNewline: true) {
+            guard !line.trimmingCharacters(in: .whitespaces).isEmpty else { continue }
+            if let response = server.handle(line) {
+                FileHandle.standardOutput.write(Data((response + "\n").utf8))
+            }
+        }
     case "apply":
         args.removeFirst()
         guard args.count == 1 else { fail("Uso: espacio apply <plan>") }
+        // La confirmación es del usuario: se exige una terminal interactiva para que un proceso (o un agente)
+        // no pueda aplicar un plan enviando el código por una tubería. ESPACIO_HOME (modo de prueba) lo permite.
+        if isatty(STDIN_FILENO) == 0 && ProcessInfo.processInfo.environment["ESPACIO_HOME"] == nil {
+            fail("espacio apply necesita una terminal interactiva: ejecútalo tú y escribe el código del plan.")
+        }
         let base = baseEnvironment()
         let plan = try PlanStore.load(args[0], base)
         if PlanStore.isApplied(plan.id, base) { throw PlanError.alreadyApplied }
@@ -220,7 +234,9 @@ do {
                               Crea un plan con elementos de `dev` (id) o archivos revisables. No ejecuta nada.
         espacio apply <plan>  Revalida, muestra vista previa y, si escribes el código del plan, ejecuta:
                               mueve a la Papelera o lanza el comando oficial de la herramienta.
-        Nunca hay borrado permanente. scan y dev solo miden y proponen.
+        espacio mcp           Servidor MCP por stdio para agentes (Claude Code, Codex): mide y crea planes,
+                              nunca los aplica.
+        Nunca hay borrado permanente. scan, dev, plan y mcp solo miden y proponen.
         Los totales siguen la lógica de du: espacio asignado, enlaces duros una vez, sin seguir enlaces.
         Carpetas protegidas y sincronizadas se miden, pero sus archivos no se listan ni son accionables.
         Los informes incluyen rutas: comparte solo los datos que necesites.

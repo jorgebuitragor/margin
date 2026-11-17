@@ -84,7 +84,7 @@ Aquí aparece por primera vez la categoría **«Candidato de bajo riesgo»**, so
 - Medición real: «Espacio disponible: antes X, después Y». Si los archivos están en la Papelera, se aclara que el espacio no se libera hasta vaciarla.
 - Pruebas de carrera (el archivo cambia entre la revisión y la acción), de permisos denegados y de fallo parcial, siempre con fixtures sintéticos y nunca sobre archivos reales.
 
-### 0.5 · Integración con agentes (esfuerzo: medio)
+### 0.5 · Integración con agentes (esfuerzo: medio) — ✅ hecha el 2026-11-17, ver VERIFICACION.md
 
 - Servidor **MCP por stdio** (`espacio mcp`) que reutiliza `SpaceCore`. Herramientas:
   - `status`: disco y RAM.

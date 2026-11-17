@@ -207,7 +207,7 @@ struct ContentView: View {
                 }
                 Spacer()
                 Label("Nada sin tu confirmación", systemImage: "checkmark.shield").foregroundStyle(accent)
-                Text("Solo Papelera o el comando oficial de cada herramienta; nunca borrado permanente.\nVersión local 0.4").font(.caption).foregroundStyle(.secondary)
+                Text("Solo Papelera o el comando oficial de cada herramienta; nunca borrado permanente.\nVersión local 0.5").font(.caption).foregroundStyle(.secondary)
             }.padding(20)
             .navigationSplitViewColumnWidth(220)
         } detail: {
