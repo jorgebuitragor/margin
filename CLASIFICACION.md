@@ -30,9 +30,9 @@ Orden de evaluación: exclusiones y protección → restricciones de acceso/sinc
 
 No inferir que un archivo no está en uso por antigüedad. Cuando una regla necesite comprobarlo y no sea posible, indicar condición no verificada y abstenerse de recomendarlo. No inferir duplicados por nombre o tamaño; detectar duplicados por contenido sigue fuera del MVP, y ni siquiera contenido idéntico prueba que ambas ubicaciones sean prescindibles.
 
-La protección puede basarse en una raíz o paquete sin inspeccionar su contenido. Mostrar «carpeta protegida; contenido no analizado» en vez de fingir una clasificación de cada archivo inaccesible. Se mantienen las exclusiones de Library y del sistema del MVP.
+La protección puede basarse en una raíz o paquete sin clasificar su contenido. Desde la 0.2 se mide el total de la carpeta protegida (solo metadatos de tamaño, como `du`) y se muestra «carpeta protegida» con ese total, sin listar ni clasificar sus archivos. Se mantienen las exclusiones de Library y del sistema del MVP: medir no las hace accionables.
 
-Los archivos de ubicaciones sincronizadas se excluyen de limpieza en el MVP. La interfaz distingue borrar del servicio de retirar una descarga local. Si el proveedor o estado de sincronización es desconocido, no afirmar que la operación solo afecta al Mac.
+Los archivos de ubicaciones sincronizadas se excluyen de limpieza en el MVP. Desde la 0.2 se reconocen Google Drive en modo espejo (`.tmp.driveupload`/`.tmp.drivedownload` en la raíz), Dropbox (`.dropbox`), `~/Library/CloudStorage/*` e iCloud; la carpeta sincronizada aparece con su total y la regla `sync`, sin listar archivos. La interfaz distingue borrar del servicio de retirar una descarga local. Si el proveedor o estado de sincronización es desconocido, no afirmar que la operación solo afecta al Mac.
 
 Revalidar clasificación, identidad, ruta y permisos antes de trasladar a Papelera. Un cambio invalida la selección previa. No mostrar porcentajes de certeza inventados ni sumar bytes protegidos o desconocidos como espacio recuperable.
 

@@ -6,6 +6,24 @@ func size(_ bytes: Int64?) -> String {
     bytes.map { ByteCountFormatter.string(fromByteCount: $0, countStyle: .file) } ?? "No disponible"
 }
 
+/// Nodo del árbol de carpetas, construido a partir de la lista plana del informe.
+struct FolderNode: Identifiable {
+    let folder: FolderTotal
+    var children: [FolderNode]?
+    var id: String { folder.path }
+
+    static func tree(_ report: ScanReport) -> [FolderNode] {
+        let byParent = Dictionary(grouping: report.folders.filter { $0.depth > 0 }) {
+            URL(fileURLWithPath: $0.path).deletingLastPathComponent().standardizedFileURL.path
+        }
+        func build(_ path: String) -> [FolderNode]? {
+            guard let list = byParent[path] else { return nil }
+            return list.sorted { $0.allocatedBytes > $1.allocatedBytes }.map { FolderNode(folder: $0, children: build($0.path)) }
+        }
+        return build(URL(fileURLWithPath: report.root).standardizedFileURL.path) ?? []
+    }
+}
+
 @MainActor
 final class AppModel: ObservableObject {
     @Published var report: ScanReport?
@@ -49,7 +67,8 @@ final class AppModel: ObservableObject {
                 guard session == current else { return }
                 report = output
                 visited = output.visited
-                message = output.cancelled ? "Cancelado · resultados parciales" : output.limited ? "Análisis parcial · límite de 20.000 elementos" : output.issues.isEmpty ? "Análisis terminado" : "Terminado con errores · resultados parciales"
+                message = output.cancelled ? "Cancelado · totales parciales" : !output.issues.isEmpty ? "Terminado con elementos ilegibles · los totales son un mínimo" : output.limited ? "Análisis terminado · se listan los 20.000 archivos más grandes" : "Análisis terminado"
+                if let provider = output.syncedBy { message += " · carpeta sincronizada con \(provider): solo se mide" }
             } catch {
                 guard session == current else { return }
                 message = error.localizedDescription
@@ -81,7 +100,7 @@ struct ContentView: View {
     @State private var category: SpaceCore.Category?
     @State private var search = ""
     @State private var selected: String?
-    @State private var tab = "Archivos"
+    @State private var tab = "Carpetas"
     private let accent = Color(red: 0.12, green: 0.58, blue: 0.48)
     var filtered: [FileEntry] {
         (model.report?.entries ?? []).filter {
@@ -95,36 +114,84 @@ struct ContentView: View {
                 Label("Espacio", systemImage: "internaldrive.fill")
                     .font(.largeTitle.bold()).foregroundStyle(accent).padding(.top, 24)
                 Text("CONOCE TU MAC").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                ForEach(["Archivos", "Memoria RAM"], id: \.self) { item in
+                ForEach(["Carpetas", "Archivos", "Memoria RAM"], id: \.self) { item in
                     Button { tab = item } label: {
-                        Label(item, systemImage: item == "Archivos" ? "folder" : "memorychip")
+                        Label(item, systemImage: item == "Carpetas" ? "folder" : item == "Archivos" ? "doc" : "memorychip")
                             .frame(maxWidth: .infinity, alignment: .leading).padding(10)
                             .background(tab == item ? accent.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 9))
                     }.buttonStyle(.plain)
                 }
                 Spacer()
                 Label("Solo lectura", systemImage: "checkmark.shield").foregroundStyle(accent)
-                Text("Tus archivos permanecen intactos.\nVersión local 0.1").font(.caption).foregroundStyle(.secondary)
+                Text("Tus archivos permanecen intactos.\nVersión local 0.2").font(.caption).foregroundStyle(.secondary)
             }.padding(20)
             .navigationSplitViewColumnWidth(220)
         } detail: {
             VStack(alignment: .leading, spacing: 18) {
                 HStack {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(tab == "Archivos" ? "Entiende qué ocupa espacio" : "Entiende tu memoria").font(.title.bold())
-                        Text(tab == "Archivos" ? "Revisa cada archivo con contexto antes de decidir." : "Mediciones reales, sin promesas de aceleración.").foregroundStyle(.secondary)
+                        Text(tab == "Memoria RAM" ? "Entiende tu memoria" : "Entiende qué ocupa espacio").font(.title.bold())
+                        Text(tab == "Carpetas" ? "Cuánto ocupa cada carpeta, incluidas las protegidas." : tab == "Archivos" ? "Revisa cada archivo con contexto antes de decidir." : "Mediciones reales, sin promesas de aceleración.").foregroundStyle(.secondary)
                     }
                     Spacer()
-                    if tab == "Archivos" {
+                    if tab != "Memoria RAM" {
                         Button("Elegir carpeta…", systemImage: "folder.badge.plus") { model.choose() }.buttonStyle(.borderedProminent).tint(accent)
                     } else {
                         Button("Actualizar", systemImage: "arrow.clockwise") { model.diagnostics = Diagnostics.read() }
                     }
                 }
-                if tab == "Archivos" { files } else { memory }
+                if tab == "Carpetas" { folders } else if tab == "Archivos" { files } else { memory }
             }.padding(28)
         }
         .tint(accent)
+    }
+    var status: some View {
+        HStack {
+            if model.busy { ProgressView().controlSize(.small) }
+            Text(model.message).font(.callout)
+            Spacer()
+            if model.busy {
+                Text("\(model.visited) revisados").foregroundStyle(.secondary)
+                Button("Cancelar") { model.cancel() }
+            }
+        }.accessibilityElement(children: .combine)
+    }
+    var folders: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 14) {
+                metric("Disponible en el volumen del usuario", size(model.diagnostics.diskAvailable), "internaldrive")
+                metric("Total de la carpeta analizada", model.report.map { size($0.totalAllocated) } ?? "—", "folder")
+                metric("Archivos revisados", "\(model.report?.visited ?? 0)", "doc.on.doc")
+            }
+            status
+            if let report = model.report {
+                Text(report.root).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                let total = max(report.totalAllocated, 1)
+                List(FolderNode.tree(report), children: \.children) { node in
+                    let folder = node.folder
+                    HStack(spacing: 10) {
+                        Image(systemName: folder.protection == "sync" ? "icloud" : folder.protection == "protected" ? "lock" : "folder")
+                            .foregroundStyle(folder.protection == nil ? accent : .secondary)
+                            .help(folder.reason ?? "Carpeta analizable")
+                        Text(folder.name).lineLimit(1).help(folder.path)
+                        Spacer()
+                        ProgressView(value: Double(folder.allocatedBytes), total: Double(total)).frame(width: 120)
+                        Text(size(folder.allocatedBytes) + (folder.partial ? "+" : "")).monospacedDigit().frame(width: 90, alignment: .trailing)
+                    }
+                    .contextMenu {
+                        Button("Mostrar en Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: folder.path)]) }
+                        Button("Analizar esta carpeta") { model.scan(URL(fileURLWithPath: folder.path)) }.disabled(folder.protection != nil)
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("\(folder.name), \(size(folder.allocatedBytes))\(folder.protection == "sync" ? ", sincronizada" : folder.protection == "protected" ? ", protegida" : "")")
+                }.frame(minHeight: 260)
+                Text("Candado: protegida (sistema, configuración, dependencias). Nube: sincronizada. Ambas se miden pero no se ofrecen para limpieza. «+» indica que hubo elementos ilegibles y el total es un mínimo.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else if !model.busy {
+                ContentUnavailableView("Empieza por una carpeta", systemImage: "folder.badge.questionmark", description: Text("Elige, por ejemplo, tu carpeta personal. Verás cuánto ocupa cada carpeta, también las de Library y las dependencias de proyectos."))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
     }
     var files: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -133,15 +200,7 @@ struct ContentView: View {
                 metric("Elementos listados", "\(model.report?.entries.count ?? 0)", "doc.on.doc")
                 metric("Omitidos / sin inspeccionar", "\(model.report?.omitted ?? 0)", "shield")
             }
-            HStack {
-                if model.busy { ProgressView().controlSize(.small) }
-                Text(model.message).font(.callout)
-                Spacer()
-                if model.busy {
-                    Text("\(model.visited) revisados").foregroundStyle(.secondary)
-                    Button("Cancelar") { model.cancel() }
-                }
-            }.accessibilityElement(children: .combine)
+            status
             if let report = model.report {
                 Text(report.root).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
             }
@@ -158,7 +217,7 @@ struct ContentView: View {
             } else {
                 Table(filtered, selection: $selected) {
                     TableColumn("Archivo") { entry in Text(entry.name).help(entry.path) }
-                    TableColumn("Tamaño") { entry in Text(size(entry.bytes)).monospacedDigit() }.width(100)
+                    TableColumn("Tamaño") { entry in Text(size(entry.bytes ?? entry.allocatedBytes)).monospacedDigit() }.width(100)
                     TableColumn("Clasificación") { entry in
                         Label(entry.classification.category.rawValue, systemImage: entry.classification.category == .protected ? "lock" : "questionmark.circle")
                     }.width(190)
@@ -183,7 +242,7 @@ struct ContentView: View {
                     ScrollView { Text(issues.joined(separator: "\n")).font(.caption).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }.frame(maxHeight: 90)
                 }
             }
-            Text("Los tamaños no equivalen a espacio recuperable. No se recomienda borrar por edad o tamaño. No se inspecciona el contenido de archivos ni se detectan duplicados.")
+            Text("Se listan los archivos más grandes y las carpetas protegidas con su total. Los tamaños no equivalen a espacio recuperable. No se recomienda borrar por edad o tamaño. No se inspecciona el contenido de archivos ni se detectan duplicados.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }

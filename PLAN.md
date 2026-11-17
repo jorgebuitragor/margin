@@ -37,7 +37,7 @@ En noviembre hubo al menos cinco sesiones de Claude Code que liberaron espacio a
 
 ## Incrementos
 
-### 0.2 · Base y visibilidad real (esfuerzo: medio)
+### 0.2 · Base y visibilidad real (esfuerzo: medio) — ✅ hecha el 2026-11-17, ver VERIFICACION.md
 
 - Hacer el commit inicial y ajustar `.gitignore`. Actualizar el README con la nueva ruta y quitar la ruta temporal fija.
 - Añadir `scripts/install.sh`, que instala `Gestor Espacio.app` en `~/Applications` y `espacio` en `~/.local/bin`.
@@ -46,7 +46,7 @@ En noviembre hubo al menos cinco sesiones de Claude Code que liberaron espacio a
 - **Detectar sincronización:** `~/Library/CloudStorage/*` (File Provider: Google Drive, OneDrive, Dropbox), además de iCloud y de los atributos y carpetas de Google Drive en `~/Documents` y `~/Desktop`. Lo que se detecte queda protegido.
 - Añadir pruebas con fixtures sintéticos de suma por carpeta, carpetas protegidas medidas y ubicaciones sincronizadas.
 
-**Aceptación:** `espacio scan ~` termina con totales por carpeta coherentes con `du -sh` (±5 %), y ningún archivo de una carpeta sincronizada aparece como accionable.
+**Aceptación:** `espacio scan ~` termina con totales por carpeta coherentes con `du -sh` (±5 %), y ningún archivo de una carpeta sincronizada aparece como accionable. *Resultado:* coincide con `du -x` (que no cruza montajes); `du` sin `-x` cuenta dos veces el montaje `devicefs` de CoreDevice.
 
 ### 0.3 · Perfiles de desarrollador (esfuerzo: medio-alto; es el que más espacio libera)
 

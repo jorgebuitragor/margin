@@ -35,6 +35,8 @@ final class SpaceCoreTests: XCTestCase {
         let report = try Scanner.scan(root: root)
         XCTAssertEqual(report.entries.count, 3)
         XCTAssertTrue(report.entries.allSatisfy { $0.classification.category == .protected && $0.bytes == nil })
+        // Las carpetas protegidas se miden aunque no se listen sus archivos.
+        XCTAssertTrue(report.entries.allSatisfy { ($0.allocatedBytes ?? 0) > 0 })
         XCTAssertFalse(report.entries.contains { $0.name == "private.pdf" || $0.name == "original.jpg" || $0.name == "id_rsa" })
         XCTAssertThrowsError(try Scanner.scan(root: root.appendingPathComponent("Library")))
     }
@@ -109,5 +111,70 @@ final class SpaceCoreTests: XCTestCase {
         let decoded = try JSONDecoder().decode(ScanReport.self, from: data)
         XCTAssertEqual(decoded.entries.first?.classification.rule, "archive")
         XCTAssertEqual(decoded.entries.first?.bytes, 50)
+    }
+
+    func testFolderTotalsMatchContents() throws {
+        _ = try file("a/uno.bin", 10_000)
+        _ = try file("a/b/dos.bin", 20_000)
+        _ = try file("c/tres.bin", 5_000)
+        let report = try Scanner.scan(root: root, options: ScanOptions(minFolderBytes: 0))
+        // Foundation normaliza /private/tmp como /tmp: se compara por sufijo.
+        func folder(_ suffix: String) throws -> FolderTotal { try XCTUnwrap(report.folders.first { $0.path.hasSuffix(suffix) }) }
+        let a = try folder("/a"), b = try folder("/a/b"), c = try folder("/c")
+        XCTAssertEqual(a.files, 2)
+        XCTAssertGreaterThanOrEqual(a.allocatedBytes, b.allocatedBytes + 10_000)
+        XCTAssertGreaterThanOrEqual(b.allocatedBytes, 20_000)
+        XCTAssertEqual(report.folders.first?.depth, 0, "La raíz es la carpeta más grande")
+        XCTAssertEqual(report.totalAllocated, report.folders.first?.allocatedBytes)
+        XCTAssertGreaterThanOrEqual(report.totalAllocated, a.allocatedBytes + c.allocatedBytes)
+    }
+    func testHardLinksCountedOnce() throws {
+        let original = try file("original.bin", 64_000)
+        try FileManager.default.linkItem(at: original, to: root.appendingPathComponent("enlace.bin"))
+        let report = try Scanner.scan(root: root)
+        let fileBytes = report.entries.compactMap(\.allocatedBytes).reduce(0, +)
+        XCTAssertLessThan(report.totalAllocated, fileBytes, "El total no debe contar dos veces el mismo inodo")
+    }
+    func testProtectedFoldersAreMeasuredButNotListed() throws {
+        _ = try file("proyecto/node_modules/pkg/index.js", 30_000)
+        _ = try file("proyecto/main.swift", 100)
+        let report = try Scanner.scan(root: root, options: ScanOptions(minFolderBytes: 0))
+        let modules = try XCTUnwrap(report.entries.first { $0.name == "node_modules" })
+        XCTAssertEqual(modules.classification.category, .protected)
+        XCTAssertGreaterThanOrEqual(modules.allocatedBytes ?? 0, 30_000)
+        XCTAssertFalse(modules.classification.canDelete)
+        XCTAssertFalse(report.entries.contains { $0.name == "index.js" })
+        let folder = try XCTUnwrap(report.folders.first { $0.path.hasSuffix("proyecto/node_modules") })
+        XCTAssertEqual(folder.protection, "protected")
+    }
+    func testGoogleDriveMirrorIsProtected() throws {
+        // Google Drive en modo espejo deja .tmp.driveupload en la raíz de la carpeta sincronizada.
+        _ = try file("Documentos/.tmp.driveupload/123", 10)
+        _ = try file("Documentos/informe.pdf", 40_000)
+        _ = try file("Descargas/instalador.dmg", 50_000)
+        let report = try Scanner.scan(root: root, options: ScanOptions(minFolderBytes: 0))
+        XCTAssertFalse(report.entries.contains { $0.name == "informe.pdf" }, "Nada sincronizado debe aparecer como archivo revisable")
+        let docs = try XCTUnwrap(report.entries.first { $0.name == "Documentos" })
+        XCTAssertEqual(docs.classification.rule, "sync")
+        XCTAssertTrue(docs.classification.reason.contains("Google Drive"))
+        XCTAssertGreaterThanOrEqual(docs.allocatedBytes ?? 0, 40_000)
+        XCTAssertTrue(report.entries.contains { $0.name == "instalador.dmg" && $0.classification.category == .review })
+        // Analizar una subcarpeta de la carpeta sincronizada hereda la protección.
+        let inner = try Scanner.scan(root: root.appendingPathComponent("Documentos"))
+        XCTAssertEqual(inner.syncedBy, "Google Drive")
+        XCTAssertTrue(inner.entries.allSatisfy { $0.bytes == nil })
+    }
+    func testCloudStoragePathIsSync() {
+        let url = URL(fileURLWithPath: "/Users/x/Library/CloudStorage/OneDrive-Personal/Docs")
+        XCTAssertEqual(SyncDetector.provider(forDirectory: url), "OneDrive")
+        XCTAssertEqual(SyncDetector.provider(forDirectory: URL(fileURLWithPath: "/Users/x/Library/Mobile Documents/com~apple~CloudDocs")), "iCloud Drive")
+    }
+    func testFolderDepthAndMinimumSize() throws {
+        _ = try file("uno/dos/tres/cuatro/grande.bin", 50_000)
+        _ = try file("pequeña/x.txt", 10)
+        let report = try Scanner.scan(root: root, options: ScanOptions(folderDepth: 2, minFolderBytes: 20_000))
+        XCTAssertTrue(report.folders.allSatisfy { $0.depth <= 2 })
+        XCTAssertFalse(report.folders.contains { $0.name == "pequeña" })
+        XCTAssertTrue(report.folders.contains { $0.name == "dos" })
     }
 }

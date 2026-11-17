@@ -39,3 +39,24 @@ SwiftPM emitió advertencias por cachés globales no escribibles en el entorno r
 - Presupuesto de rendimiento y pruebas de volumen. La implementación limita visitas a 20.000 elementos y mensajes de error a 100.
 - No hay reglas de bajo riesgo habilitadas, limpieza, firma Developer ID, notarización ni MCP.
 - La UI/CLI no son una frontera de aislamiento: ejecutan con permisos del usuario. Este prototipo es local y de solo lectura.
+
+# Verificación · 0.2
+
+Fecha local: 17 de noviembre de 2026. Mismo Mac (Apple Silicon), compilación release.
+
+## Resultados reales
+
+- `swift test`: **15 pruebas XCTest, 0 fallos**. Las 9 de la 0.1 más 6 nuevas: totales por carpeta, enlaces duros contados una vez, carpetas protegidas medidas pero no listadas, espejo de Google Drive protegido (también analizando una subcarpeta), rutas de `CloudStorage`/iCloud, y filtros de profundidad y tamaño mínimo.
+- `bash scripts/install.sh`: app instalada en `~/Applications/Gestor Espacio.app` (firma verificada con `codesign --verify --deep --strict`) y CLI en `~/.local/bin/espacio`.
+- **Comparación con `du` en `~/Developer`**: `espacio` 7,01 GB frente a `du -sh` 6,5 GiB (= 6,98 GB). Diferencia menor del 0,5 %.
+- **Análisis de la carpeta personal** (`espacio scan ~ --depth 3 --min-mb 500`): 1.627.259 elementos en 3 min 15 s (limitado por E/S, 17 % de CPU); total 77,33 GiB; 100 incidencias guardadas, en su mayoría `Operation not permitted` en datos protegidos por la privacidad de macOS (Fotos, navegadores, `FileProvider`…).
+  - `du -sk ~` dio 100,8 GiB porque **cruza el montaje `devicefs` de `~/Library/Developer/CoreDevice/DeviceFS`**, que vuelve a apuntar a datos dentro de `~/Library` y los cuenta dos veces. Con `du -skx ~/Library` (sin cruzar montajes): 46,73 GiB, idéntico al total de `~/Library` que da `espacio`. El criterio correcto de comparación es `du -x`.
+  - `~/Documents` se detectó como espejo de Google Drive (1,3 GiB, `protection: sync`) y ninguno de sus archivos aparece como revisable.
+  - Carpetas protegidas que antes eran invisibles y ahora se miden: `~/Library/Application Support/Claude` 13,4 GiB, `~/Library/Android/sdk` 11,6 GiB, `~/Library/Developer/CoreSimulator` 3,5 GiB, `~/Library/pnpm` 3,0 GiB, `~/Library/Containers/com.docker.docker` 1,95 GiB.
+
+## Pendientes materiales
+
+- La interfaz (pestaña Carpetas con árbol) compila y se instala, pero no se recorrió visualmente de punta a punta.
+- Al analizar `~` desde la app, macOS puede pedir acceso a datos de otras apps; no se probó qué diálogos aparecen ni el resultado si se deniegan.
+- La detección de Google Drive se basa en los marcadores del modo espejo; el modo streaming vive en `~/Library/CloudStorage` y se reconoce por ruta. No se comprobó Dropbox real.
+- Sin perfiles de desarrollo, sin acciones y sin MCP (0.3–0.5).

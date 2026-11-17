@@ -20,19 +20,23 @@ public enum Classifier {
         let parts = url.standardizedFileURL.pathComponents
         let reserved: Set<String> = ["System", "Library", "Applications", ".ssh", ".gnupg", ".git", ".aws", ".config", ".Trash", ".build", "node_modules", "Backups.backupdb"]
         if parts.contains(where: { reserved.contains($0) }) {
-            return "Ubicación de sistema, configuración, aplicación o recuperación. Su contenido no se analiza."
+            return "Ubicación de sistema, configuración, aplicación o recuperación. Se mide su tamaño, pero sus archivos no se listan ni se ofrecen para limpieza."
         }
         let temporaryRoot = parts.count >= 3 && parts[1] == "private" && parts[2] == "tmp"
         if parts.count > 1 && ["bin", "sbin", "usr", "etc", "private", "dev"].contains(parts[1]) && !temporaryRoot {
             return "Ubicación del sistema; no se analiza para limpieza."
         }
         if isPackage || ["app", "photoslibrary", "photolibrary", "backupbundle", "sparsebundle", "framework"].contains(url.pathExtension.lowercased()) {
-            return "Paquete o biblioteca: puede contener una aplicación, fotos o una copia de seguridad. No se inspecciona su interior."
+            return "Paquete o biblioteca: puede contener una aplicación, fotos o una copia de seguridad. Se mide su tamaño, pero no se listan sus archivos."
         }
         if url.lastPathComponent.hasPrefix(".env") || ["key", "pem", "p12", "keychain", "keychain-db", "sqlite", "sqlite3", "db"].contains(url.pathExtension.lowercased()) {
             return "Puede contener credenciales, configuración o una base de datos necesaria."
         }
         return nil
+    }
+
+    public static func synced(_ provider: String) -> Classification {
+        Classification(category: .protected, reason: "Carpeta sincronizada con \(provider). Se mide su tamaño, pero sus archivos no se listan ni se ofrecen para limpieza.", consequence: "Borrar aquí puede eliminar la copia en la nube y en tus otros dispositivos.", rule: "sync")
     }
 
     public static func classify(_ url: URL, isPackage: Bool = false, isCloud: Bool = false, isLink: Bool = false) -> Classification {
