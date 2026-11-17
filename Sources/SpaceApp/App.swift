@@ -13,6 +13,12 @@ func size(_ bytes: Int64?) -> String {
     bytes.map { formatBytes($0) } ?? "No disponible"
 }
 
+/// ESPACIO_HOME permite probar la app de punta a punta sobre una carpeta personal sintética (igual que la CLI).
+func appEnvironment() -> DevEnvironment {
+    if let home = ProcessInfo.processInfo.environment["ESPACIO_HOME"] { return DevEnvironment(home: URL(fileURLWithPath: home)) }
+    return DevEnvironment()
+}
+
 struct ReportBox: Identifiable { let report: ApplyReport; var id: String { report.planID } }
 
 /// Nodo del árbol de carpetas, construido a partir de la lista plana del informe.
@@ -103,7 +109,7 @@ final class AppModel: ObservableObject {
         planError = nil
         Task {
             let outcome: Result<(Plan, [String: String]), Error> = await Task.detached(priority: .userInitiated) {
-                let env = DevEnvironment()
+                let env = appEnvironment()
                 return Result {
                     let plan = try Planner.plan(devItems: devItems, files: files, env: env)
                     try PlanStore.save(plan, env)
@@ -126,7 +132,7 @@ final class AppModel: ObservableObject {
         applying = true
         Task {
             let outcome = await Task.detached(priority: .userInitiated) {
-                Result { try Planner.apply(plan, env: plan.environment(from: DevEnvironment())) }
+                Result { try Planner.apply(plan, env: plan.environment(from: appEnvironment())) }
             }.value
             pendingPlan = nil
             applying = false
@@ -141,7 +147,7 @@ final class AppModel: ObservableObject {
     func analyzeDev() {
         devBusy = true
         Task {
-            let report = await Task.detached(priority: .userInitiated) { DevProfiles.report() }.value
+            let report = await Task.detached(priority: .userInitiated) { DevProfiles.report(appEnvironment()) }.value
             dev = report
             devBusy = false
         }
@@ -158,6 +164,10 @@ struct SpaceApp: App {
                 .onAppear {
                     NSApp.setActivationPolicy(.regular)
                     NSApp.activate(ignoringOtherApps: true)
+                    // ESPACIO_SCAN analiza una carpeta al arrancar (pruebas de interfaz sin el selector del sistema).
+                    if let path = ProcessInfo.processInfo.environment["ESPACIO_SCAN"], model.report == nil {
+                        model.scan(URL(fileURLWithPath: path))
+                    }
                 }
         }
         .defaultSize(width: 1180, height: 780)
@@ -256,7 +266,7 @@ struct ContentView: View {
             HStack {
                 Spacer()
                 Button("Cancelar", role: .cancel) { model.pendingPlan = nil; acceptReview = false }.keyboardShortcut(.cancelAction)
-                Button(model.applying ? "Ejecutando…" : "Ejecutar \(runnable.count) pasos", role: .destructive) { model.applyPending(); acceptReview = false; devChecked.removeAll(); selected.removeAll() }
+                Button(model.applying ? "Ejecutando…" : runnable.count == 1 ? "Ejecutar 1 paso" : "Ejecutar \(runnable.count) pasos", role: .destructive) { model.applyPending(); acceptReview = false; devChecked.removeAll(); selected.removeAll() }
                     .disabled(runnable.isEmpty || model.applying || (hasReview && !acceptReview))
             }
         }.padding(24).frame(width: 720, height: 560)
@@ -428,7 +438,13 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 Table(filtered, selection: $selected) {
-                    TableColumn("Archivo") { entry in Text(entry.name).help(entry.path) }
+                    TableColumn("Archivo") { entry in
+                        // La carpeta contenedora distingue elementos homónimos (por ejemplo, varios node_modules).
+                        HStack(spacing: 6) {
+                            Text(entry.name)
+                            Text(URL(fileURLWithPath: entry.path).deletingLastPathComponent().lastPathComponent).font(.caption).foregroundStyle(.secondary)
+                        }.help(entry.path)
+                    }
                     TableColumn("Tamaño") { entry in Text(size(entry.bytes ?? entry.allocatedBytes)).monospacedDigit() }.width(100)
                     TableColumn("Clasificación") { entry in
                         Label(entry.classification.category.rawValue, systemImage: entry.classification.category == .protected ? "lock" : "questionmark.circle")

@@ -119,3 +119,18 @@ Jorge aplicó desde su terminal un plan de 8 pasos de bajo riesgo:
   - Corregido: el ejecutor pone primero en el PATH la carpeta del propio ejecutable (pnpm de nvm usa su propio `node`) y guarda la salida de error. Dos pruebas de regresión; 38 pruebas en total.
 - Espacio disponible: 17,22 GB → 17,68 GB (+452 MB, sobre todo de Homebrew). Unos 1,6 GB más se liberarán al vaciar la Papelera.
 - Observación: hay dos stores de pnpm (`v10`, 643 MB, y `v11`, 1,6 GB) de versiones distintas de pnpm; cada `pnpm store prune` solo limpia el suyo.
+
+## Recorrido visual de la app (17-11-2026)
+
+Con control de la app en segundo plano, sobre una carpeta personal sintética (`ESPACIO_HOME`, con un `pnpm` falso que no hace nada y `ESPACIO_SCAN`, que analiza una carpeta al arrancar):
+
+- **Desarrollo**: el análisis lista los perfiles; el elemento protegido («activo · node_modules») no se puede marcar; el botón cuenta los marcados; la hoja «Revisa el plan» muestra el recuperable, la acción (ruta o comando) y el coste de regenerar; «Cancelar» no toca nada y conserva las marcas; «Ejecutar» lanzó el `pnpm store prune` falso, la hoja de resultados mostró «Comando terminado» y el espacio antes/después, el registro JSONL quedó escrito y la lista se volvió a analizar.
+- **Carpetas**: árbol con totales y barras; Library y su subcarpeta pnpm con candado; las cifras cuadran con el total.
+- **Archivos**: tabla con clasificación; el panel «Por qué» muestra la causa, la consecuencia y la ruta; «Mover a la Papelera…» abre la confirmación, que exige marcar «Entiendo que hay elementos marcados Revisar…» antes de habilitar «Ejecutar». Se canceló sin mover nada.
+
+Corregido durante el recorrido: «Ejecutar 1 pasos» → «Ejecutar 1 paso»; la columna Archivo muestra la carpeta contenedora para distinguir elementos homónimos (había dos `node_modules` indistinguibles).
+
+No verificado:
+- **«Elegir carpeta…»**: el selector de macOS corre en otro proceso y no se pudo controlar, por eso se usó `ESPACIO_SCAN`. El selector sí se abre.
+- **Selección múltiple en Archivos**: ⇧↓ enviado en segundo plano no amplió la selección. Puede ser una limitación de la automatización; falta comprobarlo a mano con ⌘/⇧ y clic.
+- **Detalles menores**: la ruta raíz se muestra como `/tmp/…` cuando la carpeta está en `/private/tmp`, y el panel «Por qué» deja poca altura a la tabla.
