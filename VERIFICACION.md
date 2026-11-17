@@ -60,3 +60,22 @@ Fecha local: 17 de noviembre de 2026. Mismo Mac (Apple Silicon), compilación re
 - Al analizar `~` desde la app, macOS puede pedir acceso a datos de otras apps; no se probó qué diálogos aparecen ni el resultado si se deniegan.
 - La detección de Google Drive se basa en los marcadores del modo espejo; el modo streaming vive en `~/Library/CloudStorage` y se reconoce por ruta. No se comprobó Dropbox real.
 - Sin perfiles de desarrollo, sin acciones y sin MCP (0.3–0.5).
+
+# Verificación · 0.3
+
+Fecha local: 17 de noviembre de 2026. Mismo Mac.
+
+## Resultados reales
+
+- `swift test`: **23 pruebas, 0 fallos** (15 anteriores + 8 de perfiles). Las de perfiles usan una carpeta personal sintética y un ejecutor falso de comandos: imágenes de Android usadas frente a no usadas, NDK referenciado frente a no referenciado (este último queda en «revisar», no en bajo riesgo), artefactos de proyectos activos frente a inactivos, enlaces duros de pnpm que reducen lo recuperable, versiones de Gradle pedidas por un wrapper, simuladores no disponibles y runtimes antiguos, salida de `docker system df`, deduplicación de `~/projects`/`~/Projects`, y una prueba de seguridad: el análisis no modifica ningún archivo, solo hace consultas de una lista permitida y ningún elemento tiene `canDelete`.
+- `espacio dev --text` en este Mac (unos 37 s): **5,59 GB de bajo riesgo** y **23,25 GB para revisar**. Lo principal:
+  - Bajo riesgo: store de pnpm 2,39 GB recuperables (de 2,95 GB), repositorio de Maven 788 MB, Gradle 8.14.1 (all + bin) y 9.2.0 sin ningún wrapper que las pida (unos 815 MB), cachés de Claude Desktop 1,19 GB y descargas de Homebrew.
+  - Para revisar: máquina virtual de Claude Desktop 11,6 GB, emulador Logday_Pixel 3,9 GB (en uso hoy), simulador «BabyHome QA iPhone 17» 3,75 GB, NDK 25.1 2,25 GB (ningún proyecto revisado lo pide), Node v20.11.0 843 MB (tiene pnpm, expo y eas globales).
+  - Se conservan: imagen android-36 (la usa Logday_Pixel), NDK 27.1 (lo pide React Native), runtime iOS 26.1 (usado hace 2 días) y los `node_modules` de los proyectos activos (task-manager, baby-home, logday-*).
+- Docker no estaba en ejecución: el perfil solo midió su disco virtual (1,92 GB) y pidió abrir Docker Desktop.
+
+## Pendientes materiales
+
+- La pestaña Desarrollo compila y se instala, pero no se recorrió visualmente.
+- Los comandos propuestos no se han ejecutado: su efecto real (y el espacio que liberan) se medirá en la 0.4.
+- La actividad de proyectos se basa en el último commit y en la fecha de los archivos de primer nivel; un proyecto con trabajo reciente solo en subcarpetas profundas podría verse inactivo.

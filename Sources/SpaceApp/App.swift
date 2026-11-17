@@ -2,8 +2,15 @@ import SwiftUI
 import AppKit
 import SpaceCore
 
+func formatBytes(_ bytes: Int64) -> String {
+    let formatter = ByteCountFormatter()
+    formatter.countStyle = .file
+    formatter.allowsNonnumericFormatting = false // «0 KB» en lugar de «Zero KB»
+    return formatter.string(fromByteCount: bytes)
+}
+
 func size(_ bytes: Int64?) -> String {
-    bytes.map { ByteCountFormatter.string(fromByteCount: $0, countStyle: .file) } ?? "No disponible"
+    bytes.map { formatBytes($0) } ?? "No disponible"
 }
 
 /// Nodo del árbol de carpetas, construido a partir de la lista plana del informe.
@@ -77,6 +84,17 @@ final class AppModel: ObservableObject {
         }
     }
     func cancel() { cancellation?.cancel(); message = "Cancelando…" }
+
+    @Published var dev: DevReport?
+    @Published var devBusy = false
+    func analyzeDev() {
+        devBusy = true
+        Task {
+            let report = await Task.detached(priority: .userInitiated) { DevProfiles.report() }.value
+            dev = report
+            devBusy = false
+        }
+    }
 }
 
 @main
@@ -114,16 +132,16 @@ struct ContentView: View {
                 Label("Espacio", systemImage: "internaldrive.fill")
                     .font(.largeTitle.bold()).foregroundStyle(accent).padding(.top, 24)
                 Text("CONOCE TU MAC").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                ForEach(["Carpetas", "Archivos", "Memoria RAM"], id: \.self) { item in
+                ForEach(["Carpetas", "Archivos", "Desarrollo", "Memoria RAM"], id: \.self) { item in
                     Button { tab = item } label: {
-                        Label(item, systemImage: item == "Carpetas" ? "folder" : item == "Archivos" ? "doc" : "memorychip")
+                        Label(item, systemImage: item == "Carpetas" ? "folder" : item == "Archivos" ? "doc" : item == "Desarrollo" ? "hammer" : "memorychip")
                             .frame(maxWidth: .infinity, alignment: .leading).padding(10)
                             .background(tab == item ? accent.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 9))
                     }.buttonStyle(.plain)
                 }
                 Spacer()
                 Label("Solo lectura", systemImage: "checkmark.shield").foregroundStyle(accent)
-                Text("Tus archivos permanecen intactos.\nVersión local 0.2").font(.caption).foregroundStyle(.secondary)
+                Text("Tus archivos permanecen intactos.\nVersión local 0.3").font(.caption).foregroundStyle(.secondary)
             }.padding(20)
             .navigationSplitViewColumnWidth(220)
         } detail: {
@@ -131,16 +149,18 @@ struct ContentView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(tab == "Memoria RAM" ? "Entiende tu memoria" : "Entiende qué ocupa espacio").font(.title.bold())
-                        Text(tab == "Carpetas" ? "Cuánto ocupa cada carpeta, incluidas las protegidas." : tab == "Archivos" ? "Revisa cada archivo con contexto antes de decidir." : "Mediciones reales, sin promesas de aceleración.").foregroundStyle(.secondary)
+                        Text(tab == "Carpetas" ? "Cuánto ocupa cada carpeta, incluidas las protegidas." : tab == "Desarrollo" ? "Cachés y artefactos regenerables, con el comando oficial de cada herramienta." : tab == "Archivos" ? "Revisa cada archivo con contexto antes de decidir." : "Mediciones reales, sin promesas de aceleración.").foregroundStyle(.secondary)
                     }
                     Spacer()
-                    if tab != "Memoria RAM" {
+                    if tab == "Desarrollo" {
+                        Button(model.dev == nil ? "Analizar" : "Volver a analizar", systemImage: "hammer") { model.analyzeDev() }.buttonStyle(.borderedProminent).tint(accent).disabled(model.devBusy)
+                    } else if tab != "Memoria RAM" {
                         Button("Elegir carpeta…", systemImage: "folder.badge.plus") { model.choose() }.buttonStyle(.borderedProminent).tint(accent)
                     } else {
                         Button("Actualizar", systemImage: "arrow.clockwise") { model.diagnostics = Diagnostics.read() }
                     }
                 }
-                if tab == "Carpetas" { folders } else if tab == "Archivos" { files } else { memory }
+                if tab == "Carpetas" { folders } else if tab == "Archivos" { files } else if tab == "Desarrollo" { development } else { memory }
             }.padding(28)
         }
         .tint(accent)
@@ -189,6 +209,72 @@ struct ContentView: View {
                     .font(.caption).foregroundStyle(.secondary)
             } else if !model.busy {
                 ContentUnavailableView("Empieza por una carpeta", systemImage: "folder.badge.questionmark", description: Text("Elige, por ejemplo, tu carpeta personal. Verás cuánto ocupa cada carpeta, también las de Library y las dependencias de proyectos."))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+    }
+    @State private var devSelection: String?
+    var development: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 14) {
+                metric("Bajo riesgo · recuperable estimado", model.dev.map { size($0.lowRiskBytes) } ?? "—", "checkmark.circle")
+                metric("Para revisar", model.dev.map { size($0.reviewBytes) } ?? "—", "eye")
+                metric("Disponible en el volumen", size(model.diagnostics.diskAvailable), "internaldrive")
+            }
+            if model.devBusy {
+                HStack { ProgressView().controlSize(.small); Text("Midiendo cachés y proyectos… (unos 30 s)") }
+            }
+            if let report = model.dev {
+                let items = report.profiles.filter { $0.detected && !$0.items.isEmpty }
+                List(selection: $devSelection) {
+                    ForEach(items) { profile in
+                        Section("\(profile.name) · \(profile.owner)") {
+                            ForEach(profile.items) { item in
+                                HStack(spacing: 10) {
+                                    Image(systemName: item.category == .lowRisk ? "checkmark.circle" : item.category == .review ? "eye" : "lock")
+                                        .foregroundStyle(item.category == .lowRisk ? accent : item.category == .review ? .orange : .secondary)
+                                    Text(item.title).lineLimit(1)
+                                    Spacer()
+                                    Text(item.category.rawValue).font(.caption).foregroundStyle(.secondary)
+                                    Text(size(item.recoverable ?? item.bytes)).monospacedDigit().frame(width: 90, alignment: .trailing)
+                                }
+                                .tag(item.id)
+                                .accessibilityElement(children: .combine)
+                            }
+                            ForEach(profile.notes, id: \.self) { Text($0).font(.caption).foregroundStyle(.secondary) }
+                        }
+                    }
+                }.frame(minHeight: 260)
+                if let item = items.flatMap(\.items).first(where: { $0.id == devSelection }) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text(item.title).font(.headline)
+                            Spacer()
+                            if let path = item.path, FileManager.default.fileExists(atPath: path) {
+                                Button("Mostrar en Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }
+                            }
+                        }
+                        Text(item.reason)
+                        Text("Si se retira: \(item.regenerate)").foregroundStyle(.secondary)
+                        Text("Ocupa \(size(item.bytes)) · recuperable estimado \(size(item.recoverable))").font(.caption)
+                        if let action = item.action {
+                            HStack {
+                                Text(action.command).font(.system(.callout, design: .monospaced)).textSelection(.enabled)
+                                Spacer()
+                                Button("Copiar", systemImage: "doc.on.doc") {
+                                    NSPasteboard.general.clearContents()
+                                    NSPasteboard.general.setString(action.kind == .command ? action.command : (item.path ?? ""), forType: .string)
+                                }
+                            }
+                            if let preview = action.preview { Text("Vista previa: \(preview)").font(.caption).textSelection(.enabled) }
+                            if let note = action.note { Text(note).font(.caption).foregroundStyle(.orange) }
+                        }
+                    }.padding(16).background(accent.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
+                }
+                Text("Esta versión no ejecuta nada: copia el comando y ejecútalo tú. «Recuperable estimado» excluye archivos con enlaces duros compartidos.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else if !model.devBusy {
+                ContentUnavailableView("Analiza tus herramientas de desarrollo", systemImage: "hammer", description: Text("Android SDK y emuladores, simuladores y Xcode, node_modules de proyectos inactivos, pnpm, Gradle, Docker, Homebrew…"))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }

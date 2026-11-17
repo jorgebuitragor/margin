@@ -1,5 +1,7 @@
 # Clasificación explicada de archivos
 
+> Desde la 0.3 la categoría «Candidato de bajo riesgo» existe, pero **solo la asignan los perfiles de desarrollo** (`Sources/SpaceCore/Profiles/`), cada uno con una regla específica, evidencia (por ejemplo, «ningún emulador usa esta imagen», «proyecto sin cambios en 90 días») y el comando oficial de la herramienta dueña. El clasificador genérico de archivos sigue sin asignarla.
+
 Requisito confirmado por el usuario: indicar qué archivos se pueden borrar, cuáles conviene conservar y la causa. Motor conservador implementado en 0.1 y probado con fixtures sintéticos. Sin reglas de bajo riesgo ni operaciones de borrado; no se ha realizado un análisis de los archivos personales del usuario.
 
 ## Categorías de la interfaz

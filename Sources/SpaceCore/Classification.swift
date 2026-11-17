@@ -1,6 +1,8 @@
 import Foundation
 
 public enum Category: String, Codable, CaseIterable, Sendable {
+    /// Solo lo asigna un perfil de desarrollo con una regla específica (ver Profiles/). Nunca el clasificador genérico.
+    case lowRisk = "Candidato de bajo riesgo"
     case review = "Revisar antes de borrar"
     case protected = "Conservar / protegido"
     case unknown = "No determinado"
