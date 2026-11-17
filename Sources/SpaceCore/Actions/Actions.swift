@@ -335,7 +335,8 @@ public enum Planner {
             return StepResult(stepID: step.id, title: step.title, status: .failed, message: "No se pudo ejecutar o superó el tiempo máximo.")
         }
         return StepResult(stepID: step.id, title: step.title, status: result.status == 0 ? .done : .failed,
-                          message: result.status == 0 ? "Comando terminado." : "El comando terminó con código \(result.status).", output: tail(result.output))
+                          message: result.status == 0 ? "Comando terminado." : "El comando terminó con código \(result.status).",
+                          output: tail([result.output, result.error].filter { !$0.isEmpty }.joined(separator: "\n")))
     }
 
     static func available(_ env: DevEnvironment) -> Int64? {

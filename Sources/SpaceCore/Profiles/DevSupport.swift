@@ -50,6 +50,13 @@ public enum DiskUsage {
 public struct CommandResult: Sendable {
     public let status: Int32
     public let output: String
+    /// Salida de error, separada para no romper las consultas que leen JSON de la salida estándar.
+    public var error: String = ""
+    public init(status: Int32, output: String, error: String = "") {
+        self.status = status
+        self.output = output
+        self.error = error
+    }
 }
 
 /// Ejecuta consultas de solo lectura de las herramientas (simctl list, docker system df, git log…).
@@ -66,19 +73,24 @@ public struct ProcessRunner: CommandRunner {
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
         var env = ProcessInfo.processInfo.environment
-        env["PATH"] = (env["PATH"].map { $0 + ":" } ?? "") + "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+        // La carpeta del ejecutable va primero: una herramienta de nvm (pnpm, yarn…) debe usar el node de su misma
+        // versión, no el que tenga la terminal. Así pnpm de Node 24 no se ejecuta con Node 20.
+        let ownDir = URL(fileURLWithPath: executable).deletingLastPathComponent().path
+        env["PATH"] = ownDir + ":" + (env["PATH"].map { $0 + ":" } ?? "") + "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
         env["HOMEBREW_NO_AUTO_UPDATE"] = "1"
         process.environment = env
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
+        let outPipe = Pipe(), errPipe = Pipe()
+        process.standardOutput = outPipe
+        process.standardError = errPipe
         process.standardInput = FileHandle.nullDevice
-        let box = DataBox()
+        let out = DataBox(), err = DataBox()
         let group = DispatchGroup()
-        group.enter()
-        DispatchQueue.global().async {
-            box.data = pipe.fileHandleForReading.readDataToEndOfFile()
-            group.leave()
+        for (pipe, box) in [(outPipe, out), (errPipe, err)] {
+            group.enter()
+            DispatchQueue.global().async {
+                box.data = pipe.fileHandleForReading.readDataToEndOfFile()
+                group.leave()
+            }
         }
         do { try process.run() } catch { return nil }
         if group.wait(timeout: .now() + timeout) == .timedOut {
@@ -87,7 +99,7 @@ public struct ProcessRunner: CommandRunner {
             return nil
         }
         process.waitUntilExit()
-        return CommandResult(status: process.terminationStatus, output: String(decoding: box.data, as: UTF8.self))
+        return CommandResult(status: process.terminationStatus, output: String(decoding: out.data, as: UTF8.self), error: String(decoding: err.data, as: UTF8.self))
     }
 }
 

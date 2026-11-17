@@ -196,6 +196,35 @@ final class ActionsTests: XCTestCase {
         XCTAssertEqual(failed.results.first?.status, .failed)
     }
 
+    func testRealRunnerUsesToolsOwnNodeAndKeepsErrors() throws {
+        // Simula una herramienta de nvm: un script que llama a «node» y un «node» hermano en la misma carpeta.
+        let dir = home.appendingPathComponent(".nvm/versions/node/v24.0.0/bin")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let node = dir.appendingPathComponent("node")
+        try Data("#!/bin/sh\necho node-propio\necho aviso >&2\nexit 3\n".utf8).write(to: node)
+        let tool = dir.appendingPathComponent("herramienta")
+        try Data("#!/usr/bin/env node\n".utf8).write(to: tool)
+        for url in [node, tool] { try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path) }
+        let result = try XCTUnwrap(ProcessRunner().run(tool.path, [], timeout: 10))
+        XCTAssertEqual(result.output.trimmingCharacters(in: .whitespacesAndNewlines), "node-propio")
+        XCTAssertEqual(result.error.trimmingCharacters(in: .whitespacesAndNewlines), "aviso")
+        XCTAssertEqual(result.status, 3)
+    }
+
+    func testFailedCommandKeepsErrorOutput() throws {
+        let pnpm = try file("bin/pnpm", 0, "#!/bin/sh\n")
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: pnpm.path)
+        try file("Library/pnpm/store/v10/files/aa/blob", 2_000_000)
+        final class ErrorExecutor: ActionExecutor, @unchecked Sendable {
+            func trash(_ path: String) throws -> String? { nil }
+            func run(_ executable: String, _ arguments: [String]) -> CommandResult? { CommandResult(status: 1, output: "", error: "ERR_PNPM_X algo falló") }
+        }
+        let env = env()
+        let report = try Planner.apply(try Planner.plan(devItems: [try item(env, "Store de pnpm")], env: env), env: env, executor: ErrorExecutor())
+        XCTAssertEqual(report.results.first?.status, .failed)
+        XCTAssertTrue(report.results.first?.output?.contains("ERR_PNPM_X") == true)
+    }
+
     func testExpiredPlanIsRejected() throws {
         try oldProject()
         let env = env()

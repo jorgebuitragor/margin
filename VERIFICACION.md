@@ -109,3 +109,13 @@ Fecha local: 17 de noviembre de 2026. Mismo Mac.
 - No se ha aplicado ningún plan sobre datos reales del usuario: lo decide él.
 - Las hojas de confirmación y de resultados de la app compilan, pero no se recorrieron visualmente.
 - No se probaron con las herramientas reales los comandos `sdkmanager`, `avdmanager`, `simctl`, `docker` ni `brew` (se usó un ejecutor falso). Si uno falla, el paso queda como «falló», con la salida del comando.
+
+## Primera aplicación real (plan d2d493f0, 17-11-2026)
+
+Jorge aplicó desde su terminal un plan de 8 pasos de bajo riesgo:
+
+- **7 hechos**: `~/.m2/repository`, Gradle 8.14.1 (all y bin) y 9.2.0 (bin), `log-processor/node_modules` y `citas-api/target` movidos a la Papelera; `brew cleanup --prune=all` terminado.
+- **1 falló**: `pnpm store prune` terminó con código 1 sin mensaje. Causa: se eligió el `pnpm` de `~/.nvm/versions/node/v24.11.1` (el más nuevo), pero se ejecutó con el `node` del PATH de la terminal (v20.11.0), con el que esa versión de pnpm no arranca. Además, el ejecutor descartaba la salida de error.
+  - Corregido: el ejecutor pone primero en el PATH la carpeta del propio ejecutable (pnpm de nvm usa su propio `node`) y guarda la salida de error. Dos pruebas de regresión; 38 pruebas en total.
+- Espacio disponible: 17,22 GB → 17,68 GB (+452 MB, sobre todo de Homebrew). Unos 1,6 GB más se liberarán al vaciar la Papelera.
+- Observación: hay dos stores de pnpm (`v10`, 643 MB, y `v11`, 1,6 GB) de versiones distintas de pnpm; cada `pnpm store prune` solo limpia el suyo.
