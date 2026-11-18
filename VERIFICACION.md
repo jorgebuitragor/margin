@@ -351,4 +351,8 @@ Hechas con clics sobre una carpeta personal sintética, sin ejecutar ningún pla
 - **Con la versión instalada** (16:5x):
   - Margin › «Vaciar Papelera…» abre la confirmación propia, con «Vaciar definitivamente» y «Cancelar»; se canceló.
   - Ajustes › «Borrado definitivo» aparece apagado y muestra en naranja el riesgo de activarlo. Pulsar el interruptor abre «¿Activar el borrado definitivo?»; al cancelar sigue apagado (`borradoDefinitivo` no se guarda).
-  - Quedó sin ver con clics el estado activado (aviso en la barra lateral y en cada plan): Jorge estaba usando la app. El ajuste sigue apagado.
+  - Estado activado, visto después con permiso de Jorge:
+    - en Ajustes el riesgo pasa a rojo («Activado: lo que borre un plan no se podrá recuperar…»);
+    - la barra lateral muestra «Borrado definitivo activado», que lleva a Ajustes;
+    - «Revisar y limpiar» abre el plan con la franja roja, «Borrar definitivamente: …» en cada paso que va a la Papelera y la nota final sobre /Applications y los comandos.
+  - El plan se canceló y el registro no tiene acciones nuevas. El ajuste se apagó y se borró la clave `borradoDefinitivo` para dejarlo como estaba.
