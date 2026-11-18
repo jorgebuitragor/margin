@@ -226,4 +226,6 @@ let english: [String: String] = [
     "disponibles de %@": "available of %@",
     "%@ sin riesgo, listos para revisar": "%@ with no risk, ready to review",
     "%@ en el plan · %@": "%@ in the plan · %@",
+    "Modo de prueba": "Test mode",
+    "Margin analiza %@ en lugar de tu carpeta personal: casi todo el disco aparece como «Otros».": "Margin scans %@ instead of your home folder: almost the whole disk shows up as “Other”.",
 ]

@@ -267,3 +267,14 @@ Jorge prefirió «Margin» a «Margen».
 - Arreglado durante la revisión: las filas alternas de la tabla de Archivos salían como franjas oscuras sobre el cristal; se desactivaron. Los botones principales de la barra de herramientas («Analizar», «Elegir carpeta…») muestran texto además del icono.
 - El análisis inteligente tarda ahora unos 25 s en este Mac (también desde la terminal), no los 12 s medidos el 17-11.
 - Se devolvieron a su valor por defecto el tema y la opción de análisis al abrir, que se cambiaron para las capturas.
+
+### Pruebas en directo de la 0.8 (18-11-2026, pantalla desbloqueada)
+
+Hechas con clics sobre una carpeta personal sintética, sin ejecutar ningún plan:
+
+- **Navegación**: la barra lateral cambia de sección con su transición. ⌘1 lleva a Inicio y el menú Visualización lista las cinco secciones.
+- **Barras flotantes**: en Limpieza, al marcar un elemento aparece «1 elemento en el plan · 41,1 MB» con «Revisar plan (1)…»; al desmarcarlo, desaparece. En Archivos, la búsqueda nativa de la barra de herramientas filtra, y la barra flotante muestra «2 seleccionados (1 oculto por el filtro)» con «Mover a la Papelera (2)…».
+- **Mapa**: Lista/Mapa en la barra de herramientas; se entra en Proyectos y «Subir» vuelve a la raíz, con transición.
+- **Arreglado**: VoiceOver leía los nombres internos de los iconos («Sangría De Lista Con Viñetas», «chevron.pulldown») en Lista/Mapa y en Carpetas frecuentes; ahora lee «Lista», «Mapa» y «Carpetas frecuentes».
+- **Arreglado**: con una carpeta sintética, la barra de Inicio salía casi entera gris («Otros», 91 %), porque solo se mide esa carpeta. Jorge preguntó por qué. Ahora la barra lateral muestra «Modo de prueba» con la explicación. Con los datos reales, la barra tiene todos sus colores (verificado).
+- **Sin cubrir**: el efecto al pasar el ratón (en segundo plano no se puede mover el puntero) y ⌘2–⌘5 pulsados de verdad (⌘1 sí; el resto se probó desde el menú, que ejecuta la misma orden).

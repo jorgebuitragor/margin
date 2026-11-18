@@ -94,6 +94,15 @@ struct ContentView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
+                if let home = DevEnvironment.testSetting("HOME") {
+                    // Carpeta personal sintética: la barra del disco y los análisis solo ven esa carpeta.
+                    Label(t("Modo de prueba"), systemImage: "testtube.2")
+                        .font(.caption.weight(.semibold)).foregroundStyle(palette.warning)
+                        .padding(.horizontal, 8).padding(.vertical, 4)
+                        .glassEffect(.regular.tint(palette.warning.opacity(0.2)), in: .capsule)
+                        .help(t("Margin analiza %@ en lugar de tu carpeta personal: casi todo el disco aparece como «Otros».", home))
+                        .padding(.bottom, 6)
+                }
                 Label(t("Nada sin tu confirmación"), systemImage: "checkmark.shield.fill")
                     .font(.callout.weight(.medium)).foregroundStyle(accent)
                 Text(t("Versión %@", "0.8")).font(.caption2).foregroundStyle(.tertiary)
@@ -158,8 +167,8 @@ struct ContentView: View {
         if tab == "Carpetas" && model.report != nil {
             ToolbarItem {
                 Picker(t("Vista"), selection: $folderView.animation(.smooth)) {
-                    Label(t("Lista"), systemImage: "list.bullet.indent").tag("Lista")
-                    Label(t("Mapa"), systemImage: "square.grid.3x3.square").tag("Mapa")
+                    Image(systemName: "list.bullet.indent").accessibilityLabel(t("Lista")).help(t("Lista")).tag("Lista")
+                    Image(systemName: "square.grid.3x3.square").accessibilityLabel(t("Mapa")).help(t("Mapa")).tag("Mapa")
                 }.pickerStyle(.segmented).help(t("Vista"))
             }
         }
@@ -169,7 +178,9 @@ struct ContentView: View {
                     ForEach(AppModel.quickFolders(), id: \.path) { item in
                         Button(item.title, systemImage: "folder") { model.scan(item.url) }
                     }
-                }.help(t("Carpetas frecuentes"))
+                }
+                .help(t("Carpetas frecuentes"))
+                .accessibilityLabel(t("Carpetas frecuentes"))
             }
             ToolbarItem {
                 Button(t("Elegir carpeta…"), systemImage: "folder.badge.plus") { model.choose() }
