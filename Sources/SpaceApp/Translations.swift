@@ -221,4 +221,9 @@ let english: [String: String] = [
     "Normal": "Normal",
     "Advertencia": "Warning",
     "Crítica": "Critical",
+    "Analizando…": "Scanning…",
+    "Carpetas frecuentes": "Frequent folders",
+    "disponibles de %@": "available of %@",
+    "%@ sin riesgo, listos para revisar": "%@ with no risk, ready to review",
+    "%@ en el plan · %@": "%@ in the plan · %@",
 ]

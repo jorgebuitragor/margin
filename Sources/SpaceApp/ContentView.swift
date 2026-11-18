@@ -18,6 +18,7 @@ struct ContentView: View {
     @State var folderView = DevEnvironment.testSetting("VIEW") ?? "Lista"
     @State var mapRoot: String?
     @State var devSelection: String?
+    @State var hoveredTile: String?
     @AppStorage(Pref.colorblind) var colorblind = false
     @AppStorage(Pref.highContrast) var highContrast = false
     @AppStorage(Pref.reduceMotion) var reduceMotionSetting = false
@@ -30,37 +31,20 @@ struct ContentView: View {
     static let tabs: [(id: String, icon: String)] = [
         ("Inicio", "sparkles"), ("Limpieza", "hammer"), ("Carpetas", "folder"), ("Archivos", "doc"), ("Memoria RAM", "memorychip")
     ]
+    /// Contador por pestaña para animar solo el icono de la pestaña recién elegida.
+    @State var bounces: [String: Int] = [:]
+    var tabIndex: Int { Self.tabs.firstIndex { $0.id == tab } ?? Self.tabs.count }
 
     var body: some View {
         NavigationSplitView {
-            VStack(alignment: .leading, spacing: 22) {
-                HStack(spacing: 10) {
-                    BrandMark(color: accent).frame(width: 34, height: 34)
-                    Text("Margin").font(.largeTitle.bold()).foregroundStyle(accent)
-                }.padding(.top, 24).accessibilityElement(children: .combine)
-                Text(t("CONOCE TU MAC")).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                ForEach(Self.tabs, id: \.id) { item in sidebarButton(item.id, item.icon) }
-                Spacer()
-                sidebarButton("Ajustes", "gearshape")
-                Label(t("Nada sin tu confirmación"), systemImage: "checkmark.shield").foregroundStyle(accent)
-                Text(t("Solo Papelera o el comando oficial de cada herramienta. El único borrado definitivo es «Vaciar Papelera».") + "\n" + t("Versión %@", "0.7")).font(.caption).foregroundStyle(.secondary)
-            }.padding(20)
-            .navigationSplitViewColumnWidth(230)
+            sidebar
         } detail: {
-            VStack(alignment: .leading, spacing: 18) {
-                header
-                switch tab {
-                case "Inicio": home
-                case "Carpetas": folders
-                case "Archivos": files
-                case "Limpieza": development
-                case "Ajustes": settings
-                default: memory
-                }
-            }.padding(28)
+            detail
         }
         .tint(accent)
-        .transaction { if reduceMotion { $0.animation = nil } }
+        .transaction { if reduceMotion { $0.animation = nil; $0.disablesAnimations = true } }
+        .symbolEffectsRemoved(reduceMotion)
+        .onChange(of: model.tab) { bounces[model.tab, default: 0] += 1 }
         // Un análisis nuevo (u otra carpeta) invalida la navegación del mapa y la selección: los elementos marcados
         // pertenecían al informe anterior y no deben ir a parar a un plan sin que se vean.
         .onChange(of: model.report?.root) { mapRoot = nil; selected.removeAll() }
@@ -88,39 +72,114 @@ struct ContentView: View {
         } message: { Text(model.planError ?? "") }
     }
 
-    func sidebarButton(_ id: String, _ icon: String) -> some View {
-        Button { tab = id } label: {
-            Label(t(id), systemImage: icon)
-                .frame(maxWidth: .infinity, alignment: .leading).padding(10)
-                .background(tab == id ? accent.opacity(highContrast ? 0.25 : 0.12) : .clear, in: RoundedRectangle(cornerRadius: 9))
-                .contentShape(Rectangle())
+    /// Barra lateral nativa: en macOS 26 flota como Liquid Glass y la sección elegida ya hace de título.
+    var sidebar: some View {
+        List(selection: Binding<String?>(get: { model.tab }, set: { if let value = $0 { model.tab = value } })) {
+            Section(t("CONOCE TU MAC")) {
+                ForEach(Self.tabs, id: \.id) { item in sidebarRow(item.id, item.icon) }
+            }
+            Section {
+                sidebarRow("Ajustes", "gearshape")
+            }
         }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(tab == id ? .isSelected : [])
+        .listStyle(.sidebar)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            HStack(spacing: 10) {
+                BrandMark(color: accent).frame(width: 30, height: 30)
+                Text("Margin").font(.title2.bold())
+                Spacer()
+            }
+            .padding(.horizontal, 18).padding(.top, 6).padding(.bottom, 10)
+            .accessibilityElement(children: .combine)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(alignment: .leading, spacing: 4) {
+                Label(t("Nada sin tu confirmación"), systemImage: "checkmark.shield.fill")
+                    .font(.callout.weight(.medium)).foregroundStyle(accent)
+                Text(t("Versión %@", "0.8")).font(.caption2).foregroundStyle(.tertiary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 18).padding(.vertical, 14)
+            .help(t("Solo Papelera o el comando oficial de cada herramienta. El único borrado definitivo es «Vaciar Papelera»."))
+        }
+        .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
     }
 
-    static let subtitles: [String: String] = [
-        "Inicio": "Cuánto ocupa tu disco y dónde se acumula espacio, en menos de un minuto.",
-        "Carpetas": "Cuánto ocupa cada carpeta, incluidas las protegidas.",
-        "Limpieza": "Cada elemento con su causa, su coste y el comando oficial de su herramienta.",
-        "Archivos": "Revisa cada archivo con contexto antes de decidir.",
-        "Memoria RAM": "Mediciones reales, sin promesas de aceleración.",
-        "Ajustes": "Cómo analiza, cómo se ve y en qué idioma te habla Margin."
-    ]
+    func sidebarRow(_ id: String, _ icon: String) -> some View {
+        Label(t(id), systemImage: icon)
+            .symbolEffect(.bounce, value: bounces[id, default: 0])
+            .tag(id)
+    }
 
-    var header: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(tab == "Ajustes" ? t("Ajustes") : tab == "Memoria RAM" ? t("Entiende tu memoria") : t("Entiende qué ocupa espacio")).font(.title.bold())
-                Text(t(Self.subtitles[tab] ?? "")).foregroundStyle(.secondary)
+    /// Contenido de la pestaña sobre el fondo de color; al cambiar de pestaña entra con un fundido y un leve desplazamiento.
+    var detail: some View {
+        ZStack {
+            Backdrop(index: tabIndex, accent: accent)
+                .ignoresSafeArea()
+                .animation(.smooth(duration: 0.9), value: tabIndex)
+            Group {
+                switch tab {
+                case "Inicio": home
+                case "Carpetas": folders
+                case "Archivos": files
+                case "Limpieza": development
+                case "Ajustes": settings
+                default: memory
+                }
             }
-            Spacer()
-            if tab == "Limpieza" || tab == "Inicio" {
-                Button(model.dev == nil ? t("Analizar") : t("Volver a analizar"), systemImage: "sparkles") { model.analyzeDev() }.buttonStyle(.borderedProminent).tint(accent).disabled(model.devBusy)
-            } else if tab == "Carpetas" || tab == "Archivos" {
-                Button(t("Elegir carpeta…"), systemImage: "folder.badge.plus") { model.choose() }.buttonStyle(.borderedProminent).tint(accent)
-            } else if tab == "Memoria RAM" {
-                Button(t("Actualizar"), systemImage: "arrow.clockwise") { model.diagnostics = Diagnostics.read() }
+            .id(tab)
+            .transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: 12)).combined(with: .scale(scale: 0.99)), removal: .opacity))
+        }
+        .animation(.smooth(duration: 0.35), value: tab)
+        .toolbar(removing: .title)
+        .toolbar { toolbarContent }
+    }
+
+    /// Las acciones de cada pestaña viven en la barra de herramientas (Liquid Glass en macOS 26).
+    @ToolbarContentBuilder
+    var toolbarContent: some ToolbarContent {
+        if tab == "Inicio" {
+            ToolbarItem {
+                Button(t("Volver a medir el disco"), systemImage: "arrow.clockwise") { model.measureStorage() }
+                    .symbolEffect(.rotate, isActive: model.storageProgress != nil)
+                    .disabled(model.storageProgress != nil)
+                    .help(t("Volver a medir el disco"))
+            }
+        }
+        if tab == "Inicio" || tab == "Limpieza" {
+            ToolbarItem {
+                Button(model.devBusy ? t("Analizando…") : model.dev == nil ? t("Analizar") : t("Volver a analizar"), systemImage: "sparkles") { model.analyzeDev() }
+                    .symbolEffect(.variableColor.iterative, isActive: model.devBusy)
+                    .labelStyle(.titleAndIcon)
+                    .buttonStyle(.glassProminent).tint(accent)
+                    .disabled(model.devBusy)
+            }
+        }
+        if tab == "Carpetas" && model.report != nil {
+            ToolbarItem {
+                Picker(t("Vista"), selection: $folderView.animation(.smooth)) {
+                    Label(t("Lista"), systemImage: "list.bullet.indent").tag("Lista")
+                    Label(t("Mapa"), systemImage: "square.grid.3x3.square").tag("Mapa")
+                }.pickerStyle(.segmented).help(t("Vista"))
+            }
+        }
+        if tab == "Carpetas" || tab == "Archivos" {
+            ToolbarItem {
+                Menu(t("Carpetas frecuentes"), systemImage: "star") {
+                    ForEach(AppModel.quickFolders(), id: \.path) { item in
+                        Button(item.title, systemImage: "folder") { model.scan(item.url) }
+                    }
+                }.help(t("Carpetas frecuentes"))
+            }
+            ToolbarItem {
+                Button(t("Elegir carpeta…"), systemImage: "folder.badge.plus") { model.choose() }
+                    .labelStyle(.titleAndIcon)
+                    .buttonStyle(.glassProminent).tint(accent)
+            }
+        }
+        if tab == "Memoria RAM" {
+            ToolbarItem {
+                Button(t("Actualizar"), systemImage: "arrow.clockwise") { withAnimation(.smooth) { model.diagnostics = Diagnostics.read() } }
             }
         }
     }
@@ -192,14 +251,17 @@ struct ContentView: View {
         }.accessibilityElement(children: .combine)
     }
 
-    func metric(_ title: String, _ value: String, _ icon: String) -> some View {
+    func metric(_ title: String, _ value: String, _ icon: String, tint: Color? = nil) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Label(title, systemImage: icon).font(.caption).foregroundStyle(.secondary)
             Text(value).font(.title2.weight(.semibold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
-        }.frame(maxWidth: .infinity, alignment: .leading).padding(18)
-            .background(palette.cardFill, in: RoundedRectangle(cornerRadius: 12))
-            .overlay { if highContrast { RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.35)) } }
-            .accessibilityElement(children: .combine)
+                .foregroundStyle(tint ?? .primary)
+                .contentTransition(.numericText())
+                .animation(.smooth, value: value)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading).padding(18)
+        .surface(tint: tint?.opacity(0.12), highContrast: highContrast)
+        .accessibilityElement(children: .combine)
     }
 
     /// Métrica de disponible con el total: «20,4 GB de 245,1 GB».
@@ -213,12 +275,15 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 8) {
             Label(title, systemImage: icon).font(.headline)
             Text(primary).font(.title2.weight(.semibold)).monospacedDigit()
+                .contentTransition(.numericText())
+                .animation(.smooth, value: primary)
             Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+            Spacer(minLength: 0)
             actions()
         }
-        .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading).padding(16)
-        .background(palette.cardFill, in: RoundedRectangle(cornerRadius: 12))
-        .overlay { if highContrast { RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.35)) } }
+        .frame(maxWidth: .infinity, minHeight: 128, alignment: .topLeading).padding(16)
+        .surface(interactive: true, highContrast: highContrast)
+        .hoverLift(!reduceMotion)
         .accessibilityElement(children: .contain)
     }
 }

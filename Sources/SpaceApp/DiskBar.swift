@@ -34,8 +34,11 @@ struct DiskBar: View {
     let storage: StorageBreakdown?
     let progress: (done: Int, total: Int)?
     let palette: Palette
-    var compact = false
+    var reduceMotion = false
     var onMeasure: () -> Void = {}
+    /// Las categorías se llenan de izquierda a derecha al aparecer.
+    @State private var grown = false
+    @State private var hovered: String?
 
     struct Piece: Identifiable {
         let id: String
@@ -60,46 +63,62 @@ struct DiskBar: View {
     var body: some View {
         let total = storage?.total ?? capacity?.total ?? 0
         let available = storage?.available ?? capacity?.available ?? 0
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(t("%@ disponibles", size(available))).font(compact ? .headline : .title2.weight(.semibold)).monospacedDigit()
-                Text(t("de %@", size(total))).foregroundStyle(.secondary).monospacedDigit()
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(size(available)).font(.system(size: 30, weight: .bold, design: .rounded)).monospacedDigit()
+                    .contentTransition(.numericText())
+                Text(t("disponibles de %@", size(total))).foregroundStyle(.secondary).monospacedDigit()
                 Spacer()
                 if let progress {
-                    ProgressView(value: Double(progress.done), total: Double(max(progress.total, 1))).frame(width: 90)
                     Text(t("Midiendo el disco…")).font(.caption).foregroundStyle(.secondary)
-                } else if !compact {
-                    if let storage { Text(t("Medido %@", storage.date.formatted(.relative(presentation: .named).locale(Localizer.locale)))).font(.caption).foregroundStyle(.secondary) }
-                    Button(storage == nil ? t("Medir el disco") : t("Volver a medir"), systemImage: "arrow.clockwise", action: onMeasure).controlSize(.small)
+                    ProgressView(value: Double(progress.done), total: Double(max(progress.total, 1))).frame(width: 90)
+                } else if let storage {
+                    Text(t("Medido %@", storage.date.formatted(.relative(presentation: .named).locale(Localizer.locale)))).font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Button(t("Medir el disco"), systemImage: "arrow.clockwise", action: onMeasure).buttonStyle(.glass)
                 }
             }
-            bar(total: total).frame(height: compact ? 14 : 26)
-            if !compact { legend(total: total) }
+            .animation(.smooth, value: available)
+            bar(total: total).frame(height: 30)
+            legend(total: total)
         }
         .accessibilityElement(children: .contain)
+        .onAppear {
+            if reduceMotion { grown = true } else { withAnimation(.spring(response: 0.9, dampingFraction: 0.82).delay(0.15)) { grown = true } }
+        }
     }
 
     func bar(total: Int64) -> some View {
         GeometryReader { geo in
-            HStack(spacing: palette.highContrast ? 2 : 1) {
-                ForEach(pieces) { piece in
-                    let width = max(piece.bytes > 0 ? 3 : 0, geo.size.width * CGFloat(Double(piece.bytes) / Double(max(total, 1))) - (palette.highContrast ? 2 : 1))
-                    Group {
-                        if piece.isAvailable {
-                            Rectangle().fill(Color.primary.opacity(0.06))
-                                .overlay(Rectangle().strokeBorder(Color.primary.opacity(palette.highContrast ? 0.6 : 0.2), lineWidth: palette.borderWidth))
-                        } else {
-                            Rectangle().fill(piece.color)
-                        }
-                    }
-                    .frame(width: width)
-                    .help("\(piece.title): \(size(piece.bytes)) (\(percent(piece.bytes, of: total))) · \(piece.detail)")
-                    .accessibilityElement()
-                    .accessibilityLabel("\(piece.title), \(size(piece.bytes)), \(percent(piece.bytes, of: total))")
+            let gap: CGFloat = palette.highContrast ? 2 : 1.5
+            let used = pieces.filter { !$0.isAvailable }
+            let widths = used.map { max(3, geo.size.width * CGFloat(Double($0.bytes) / Double(max(total, 1))) - gap) * (grown ? 1 : 0) }
+            HStack(spacing: gap) {
+                ForEach(Array(used.enumerated()), id: \.element.id) { index, piece in
+                    Rectangle().fill(piece.color.gradient)
+                        .brightness(hovered == piece.id ? 0.12 : 0)
+                        .frame(width: widths[index])
+                        .onHover { hovered = $0 ? piece.id : (hovered == piece.id ? nil : hovered) }
+                        .help("\(piece.title): \(size(piece.bytes)) (\(percent(piece.bytes, of: total))) · \(piece.detail)")
+                        .accessibilityElement()
+                        .accessibilityLabel("\(piece.title), \(size(piece.bytes)), \(percent(piece.bytes, of: total))")
+                }
+                // Disponible: el hueco libre de la barra, con un borde punteado como el icono de Margin.
+                if let free = pieces.first(where: \.isAvailable) {
+                    RoundedRectangle(cornerRadius: 4)
+                        .strokeBorder(Color.primary.opacity(palette.highContrast ? 0.6 : 0.3), style: StrokeStyle(lineWidth: palette.borderWidth, dash: [4, 3]))
+                        .padding(2)
+                        .frame(maxWidth: .infinity)
+                        .help("\(free.title): \(size(free.bytes)) (\(percent(free.bytes, of: total))) · \(free.detail)")
+                        .accessibilityElement()
+                        .accessibilityLabel("\(free.title), \(size(free.bytes)), \(percent(free.bytes, of: total))")
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 7))
-            .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(Color.primary.opacity(palette.highContrast ? 0.7 : 0.15), lineWidth: palette.borderWidth))
+            .animation(.spring(response: 0.7, dampingFraction: 0.85), value: widths)
+            .overlay { if progress != nil && !reduceMotion { Shimmer() } }
+            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(Color.primary.opacity(palette.highContrast ? 0.7 : 0.12), lineWidth: palette.borderWidth))
         }
     }
 
@@ -124,5 +143,20 @@ struct DiskBar: View {
                 .accessibilityElement(children: .combine)
             }
         }
+    }
+}
+
+/// Brillo que recorre la barra mientras se mide el disco.
+struct Shimmer: View {
+    @State private var phase: CGFloat = -1
+    var body: some View {
+        GeometryReader { geo in
+            LinearGradient(colors: [.clear, .white.opacity(0.35), .clear], startPoint: .leading, endPoint: .trailing)
+                .frame(width: geo.size.width * 0.35)
+                .offset(x: phase * geo.size.width * 1.35)
+                .onAppear { withAnimation(.linear(duration: 1.4).repeatForever(autoreverses: false)) { phase = 1 } }
+        }
+        .allowsHitTesting(false)
+        .blendMode(.plusLighter)
     }
 }

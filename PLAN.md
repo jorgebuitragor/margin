@@ -124,6 +124,12 @@ Pendiente:
 - **Idiomas**: español e inglés en caliente, con tamaños y fechas en el formato de cada idioma. Pendiente: las explicaciones que genera el análisis (motivo, consecuencia, notas) siguen en español.
 - **Nuevo nombre: Margin** (primero se eligió «Margen»; Jorge prefirió «Margin» el mismo día). App `Margin.app` (`local.margin.mac`) con icono propio, comando `margin` (alias `margen` y `espacio`), MCP `margin`, carpeta de datos `Margin` (migra `GestorEspacio` o `Margen`) y variables `MARGIN_*` (las `MARGEN_*` y `ESPACIO_*` siguen valiendo). La carpeta del repositorio conserva su nombre.
 
+### 0.8 · Navegación y Liquid Glass (pedido por Jorge) — ✅ hecha el 2026-11-18, ver VERIFICACION.md
+
+- Barra lateral nativa (la sección elegida hace de título; se quitan los encabezados repetidos), acciones en la barra de herramientas, búsqueda nativa en Archivos, ⌘1–⌘5.
+- Liquid Glass (`glassEffect`, `GlassEffectContainer`, botones `.glass`/`.glassProminent`) en tarjetas, paneles y barras flotantes, sobre un fondo de malla de color por sección. Mínimo: macOS 26.
+- Animaciones y efectos de símbolos, con «Reducir movimiento» y «Reducir transparencia» respetados.
+
 Pendiente después de la 0.7:
 
 - Traducir al inglés los textos del análisis (perfiles, clasificación, mensajes de los planes).

@@ -35,7 +35,15 @@ struct MarginApp: App {
         .defaultSize(width: 1180, height: 780)
         .commands {
             CommandGroup(replacing: .appSettings) {
-                Button(t("Ajustes…")) { model.showTabs = ["Ajustes"] }.keyboardShortcut(",", modifiers: .command)
+                Button(t("Ajustes…")) { model.tab = "Ajustes" }.keyboardShortcut(",", modifiers: .command)
+            }
+            // ⌘1…⌘5 saltan entre secciones sin tocar el ratón.
+            CommandGroup(before: .sidebar) {
+                ForEach(Array(ContentView.tabs.enumerated()), id: \.element.id) { index, item in
+                    Button(t(item.id)) { model.tab = item.id }
+                        .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .command)
+                }
+                Divider()
             }
             // Carpetas frecuentes sin pasar por el selector del sistema (también accesibles por teclado).
             CommandMenu(t("Analizar")) {

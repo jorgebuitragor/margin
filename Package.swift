@@ -5,7 +5,7 @@ import PackageDescription
 // de la terminal en un sistema de archivos que no distingue mayúsculas.
 let package = Package(
     name: "Margin",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS("26.0")],
     products: [
         .executable(name: "MarginApp", targets: ["SpaceApp"]),
         .executable(name: "margin", targets: ["SpaceCLI"])

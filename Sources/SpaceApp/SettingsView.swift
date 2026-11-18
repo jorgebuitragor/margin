@@ -111,6 +111,9 @@ struct SettingsPane: View {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        .padding(.horizontal, 12)
     }
 
     func setRoots(_ list: [String]) {

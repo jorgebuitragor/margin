@@ -253,3 +253,17 @@ Jorge prefirió «Margin» a «Margen».
   - `install-agentes.sh` dejó registrado solo el MCP `margin` (Claude Code: Connected; Codex: enabled).
   - `espacio disco --text` y `margen --help` funcionan.
   - La app instalada muestra «Margin» en la barra lateral y en la ventana.
+
+## 0.8 · Navegación más fluida y Liquid Glass (18-11-2026)
+
+- Compila con el SDK de macOS 27. El mínimo pasa a macOS 26, que es donde existe Liquid Glass. Pasan las **63 pruebas**.
+- **Revisión visual** con capturas, abriendo la app en cada sección (`MARGIN_TAB`), en modo claro y oscuro: Inicio (antes del análisis, tarjetas de carga durante el análisis y resultados con la barra flotante), Carpetas (mapa en cristal, Lista/Mapa en la barra de herramientas), Archivos (búsqueda en la barra de herramientas), Memoria RAM y Ajustes.
+- **Lo que no se pudo probar**: la pantalla volvió a bloquearse, así que los clics no fueron posibles. Faltan por comprobar en directo:
+  - las animaciones (cambio de sección, mapa, barras que crecen, cifras);
+  - el relieve al pasar el ratón;
+  - los atajos ⌘1–⌘5;
+  - que la barra flotante aparezca al marcar casillas.
+  Todo compila y se ve bien en reposo.
+- Arreglado durante la revisión: las filas alternas de la tabla de Archivos salían como franjas oscuras sobre el cristal; se desactivaron. Los botones principales de la barra de herramientas («Analizar», «Elegir carpeta…») muestran texto además del icono.
+- El análisis inteligente tarda ahora unos 25 s en este Mac (también desde la terminal), no los 12 s medidos el 17-11.
+- Se devolvieron a su valor por defecto el tema y la opción de análisis al abrir, que se cambiaron para las capturas.
