@@ -157,3 +157,9 @@ Fecha local: 17 de noviembre de 2026. Mismo Mac.
 
 - No se probó con Codex (el comando que hay que registrar es el mismo: `~/.local/bin/espacio mcp`).
 - `scan_folder` sobre la carpeta personal tarda unos 3 minutos; un cliente MCP con un tiempo límite corto podría cortarlo.
+
+## Segunda aplicación real (plan 59294cb7, creado por Claude Code vía MCP)
+
+- `pnpm store prune` (pnpm 11 de Node 24, ya ejecutado con su propio `node`): hecho. Según pnpm, eliminó 82.091 archivos (1,46 GB) y 1.528 paquetes; el store `v11` pasó de 1,6 GB a 12 KB. El arreglo del ejecutor queda confirmado con datos reales.
+- Espacio disponible: 19,68 GB → 20,72 GB (+1,05 GB observado; la diferencia con lo que informa pnpm se debe a la actividad del sistema y a APFS).
+- Queda el store `v10` (643 MB), que pertenece a la otra versión de pnpm (12.4.2, en Node 20.11.0). El perfil lo mide junto al `v11` y solo propone un `prune`: mejora pendiente para la 0.6.
