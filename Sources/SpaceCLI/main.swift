@@ -107,10 +107,20 @@ func printPlan(_ plan: Plan, previews: [String: String] = [:]) {
     }
 }
 
-func readConfirmation(_ code: String) -> Bool {
-    print("\nPara ejecutar, escribe el código del plan (\(code)) y pulsa Intro. Cualquier otra cosa cancela: ", terminator: "")
+/// Pide escribir una palabra exacta (sin distinguir mayúsculas). La explicación va aparte y la última línea solo
+/// muestra lo que hay que escribir, para que no se confunda con el aviso. Si no coincide, dice qué se esperaba.
+func confirm(word: String, action: String) -> Bool {
+    print("\nPara \(action), escribe \(word) y pulsa Intro. Cualquier otra cosa cancela.")
+    print("Escribe \(word): ", terminator: "")
     fflush(stdout)
-    return readLine()?.trimmingCharacters(in: .whitespaces) == code
+    let typed = readLine()?.trimmingCharacters(in: .whitespaces) ?? ""
+    if typed.caseInsensitiveCompare(word) == .orderedSame { return true }
+    print(typed.isEmpty ? "Cancelado. No se ha tocado nada." : "Cancelado: se esperaba «\(word)» y se escribió «\(typed)». No se ha tocado nada.")
+    return false
+}
+
+func readConfirmation(_ code: String) -> Bool {
+    confirm(word: code, action: "ejecutar el plan")
 }
 
 func intValue(_ args: inout [String], _ flag: String) -> Int? {
@@ -187,12 +197,10 @@ do {
         if let bytes = trash.bytes, let items = trash.items {
             print("La Papelera tiene \(items) \(items == 1 ? "elemento" : "elementos") (\(size(bytes))).")
         } else {
-            print("macOS no deja leer la Papelera sin «Acceso total al disco»: no se puede mostrar su tamaño.")
+            print("macOS no deja leer la Papelera sin «Acceso total al disco»: no se puede mostrar su tamaño (para vaciarla no hace falta).")
         }
-        print("Vaciarla BORRA DEFINITIVAMENTE lo que contiene. No se puede deshacer.")
-        print("Para continuar escribe VACIAR y pulsa Intro. Cualquier otra cosa cancela: ", terminator: "")
-        fflush(stdout)
-        guard readLine()?.trimmingCharacters(in: .whitespaces) == "VACIAR" else { print("Cancelado. No se ha tocado nada."); exit(0) }
+        print("⚠️  Vaciar la Papelera elimina para siempre lo que contiene. No se puede deshacer.")
+        guard confirm(word: "VACIAR", action: "vaciarla") else { exit(0) }
         let result = TrashEmptier.empty(env: env)
         print("\(result.status == .done ? "✓" : "✗") \(result.message)")
         if result.status == .blocked { exit(1) }
@@ -229,7 +237,7 @@ do {
             if blocked.count == plan.steps.count { fail("\nNingún paso se puede ejecutar.") }
         }
         print("\nLo que vaya a la Papelera se puede recuperar desde Finder hasta que la vacíes. Los comandos de las herramientas no se pueden deshacer.")
-        guard readConfirmation(plan.id) else { print("Cancelado. No se ha tocado nada."); exit(0) }
+        guard readConfirmation(plan.id) else { exit(0) }
         let report = try Planner.apply(plan, env: env) { result in
             let mark = result.status == .done ? "✓" : result.status == .blocked ? "✗" : "!"
             print("\(mark) \(result.title): \(result.message)")
