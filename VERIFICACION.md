@@ -188,3 +188,13 @@ Fecha local: 17 de noviembre de 2026. Mismo Mac.
   - plurales («1 elementos», «1 carpetas»).
 - No probado: el vaciado real con Finder, que lo hará Jorge. La primera vez macOS pedirá permiso de Automatización para controlar Finder.
 - En modo de prueba, los perfiles que consultan herramientas reales (por ejemplo `brew --cache`) siguen apuntando a datos reales. No hay que ejecutar planes en ese modo.
+
+## 0.6 · mapa, memoria y selección (17-11-2026)
+
+- `swift test`: **56 pruebas, 0 fallos**. Las 4 nuevas comprueban:
+  - que el mapa reparte áreas proporcionales (error menor del 0,1 %), dentro de los límites y sin solapes, y que con valores iguales las piezas son cuadradas;
+  - que cada nivel del mapa añade «Otros» para que las áreas sumen el total de la carpeta;
+  - que el diagnóstico lee la presión de memoria y las apps ordenadas por consumo.
+- **Lectura real en este Mac**: presión «Advertencia» (nivel 2) y 9 GB de intercambio. Apps que más memoria usan: Firefox 6,2 GB (20 procesos), ChatGPT 2,4 GB, Claude 1,7 GB, Google Chrome 1,1 GB. Hay 174 procesos del sistema que no se pueden inspeccionar sin privilegios; la app lo indica.
+- El menú «Analizar» aparece en la barra de menús con las carpetas que existen.
+- No verificado visualmente (pantalla bloqueada durante la prueba): el mapa, la nueva pestaña de memoria, las casillas de Archivos y los atajos de teclado. La app compila, se instala y arranca.

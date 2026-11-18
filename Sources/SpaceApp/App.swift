@@ -93,6 +93,19 @@ final class AppModel: ObservableObject {
     }
     func cancel() { cancellation?.cancel(); message = "Cancelando…" }
 
+    struct QuickFolder { let title: String; let url: URL; let shortcut: KeyEquivalent; var path: String { url.path } }
+    /// Carpetas habituales que existen en esta carpeta personal (respeta ESPACIO_HOME en pruebas).
+    static func quickFolders() -> [QuickFolder] {
+        let home = appEnvironment().home
+        let candidates: [QuickFolder] = [
+            QuickFolder(title: "Carpeta personal", url: home, shortcut: "h"),
+            QuickFolder(title: "Descargas", url: home.appendingPathComponent("Downloads"), shortcut: "l"),
+            QuickFolder(title: "Escritorio", url: home.appendingPathComponent("Desktop"), shortcut: "d"),
+            QuickFolder(title: "Developer", url: home.appendingPathComponent("Developer"), shortcut: "p")
+        ]
+        return candidates.filter { FileManager.default.fileExists(atPath: $0.url.path) }
+    }
+
     @Published var dev: DevReport?
     @Published var devBusy = false
 
@@ -190,6 +203,18 @@ struct SpaceApp: App {
                 }
         }
         .defaultSize(width: 1180, height: 780)
+        .commands {
+            // Carpetas frecuentes sin pasar por el selector del sistema (también accesibles por teclado).
+            CommandMenu("Analizar") {
+                ForEach(AppModel.quickFolders(), id: \.path) { item in
+                    Button(item.title) { model.scan(item.url) }
+                        .keyboardShortcut(item.shortcut, modifiers: [.command, .shift])
+                }
+                Divider()
+                Button("Elegir carpeta…") { model.choose() }.keyboardShortcut("o", modifiers: .command)
+                Button("Análisis inteligente") { model.analyzeDev() }.keyboardShortcut("r", modifiers: .command)
+            }
+        }
     }
 }
 
@@ -250,6 +275,7 @@ struct ContentView: View {
             }.padding(28)
         }
         .tint(accent)
+        .onChange(of: model.report?.root) { mapRoot = nil }
         .sheet(item: $model.pendingPlan) { plan in confirmation(plan) }
         .alert("¿Vaciar la Papelera?", isPresented: $confirmEmpty) {
             Button("Cancelar", role: .cancel) {}
@@ -335,6 +361,64 @@ struct ContentView: View {
             }
         }.accessibilityElement(children: .combine)
     }
+    @State private var folderView = "Lista"
+    @State private var mapRoot: String?
+
+    /// Mapa de áreas de un nivel; un clic en una carpeta con subcarpetas entra en ella.
+    func treemap(_ report: ScanReport) -> some View {
+        let root = URL(fileURLWithPath: report.root).standardizedFileURL.path
+        let current = mapRoot.flatMap { path in report.folders.contains { $0.path == path } ? path : nil } ?? root
+        let items = Treemap.children(of: current, in: report)
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Button("Subir", systemImage: "arrow.up") {
+                    let parent = URL(fileURLWithPath: current).deletingLastPathComponent().standardizedFileURL.path
+                    mapRoot = parent.count >= root.count ? parent : root
+                }.disabled(current == root)
+                Text(current == root ? "Carpeta analizada" : String(current.dropFirst(root.count + 1))).font(.callout).lineLimit(1).truncationMode(.head)
+                Spacer()
+                Text("Clic para entrar en una carpeta · solo se ven las del informe (≥ 1 MB, hasta 3 niveles)").font(.caption).foregroundStyle(.secondary)
+            }
+            GeometryReader { geo in
+                let rects = Treemap.layout(items.map { Double($0.allocatedBytes) }, in: CGRect(origin: .zero, size: geo.size))
+                ZStack(alignment: .topLeading) {
+                    ForEach(Array(items.enumerated()), id: \.element.id) { index, folder in
+                        let rect = rects[index]
+                        let isRest = folder.path.hasSuffix("/…")
+                        let canEnter = !isRest && !Treemap.children(of: folder.path, in: report).isEmpty
+                        let color: Color = isRest ? .gray : folder.protection == "sync" ? .blue : folder.protection == "protected" ? .secondary : accent
+                        Button {
+                            if canEnter { mapRoot = folder.path }
+                        } label: {
+                            ZStack(alignment: .topLeading) {
+                                RoundedRectangle(cornerRadius: 6).fill(color.opacity(isRest ? 0.18 : 0.35))
+                                RoundedRectangle(cornerRadius: 6).strokeBorder(color.opacity(0.8), lineWidth: 1)
+                                if rect.width > 70 && rect.height > 34 {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        HStack(spacing: 4) {
+                                            if folder.protection == "protected" { Image(systemName: "lock.fill").font(.caption2) }
+                                            if folder.protection == "sync" { Image(systemName: "icloud.fill").font(.caption2) }
+                                            Text(isRest ? "Otros" : folder.name).font(.caption.weight(.semibold)).lineLimit(1)
+                                        }
+                                        Text(size(folder.allocatedBytes)).font(.caption2).monospacedDigit()
+                                    }.padding(6)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .frame(width: max(rect.width - 2, 0), height: max(rect.height - 2, 0))
+                        .offset(x: rect.minX + 1, y: rect.minY + 1)
+                        .help("\(isRest ? "Archivos sueltos y carpetas pequeñas" : folder.path) · \(size(folder.allocatedBytes))\(folder.reason.map { " · " + $0 } ?? "")")
+                        .contextMenu {
+                            if !isRest { Button("Mostrar en Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: folder.path)]) } }
+                        }
+                        .accessibilityLabel("\(isRest ? "Otros" : folder.name), \(size(folder.allocatedBytes))\(folder.protection == "protected" ? ", protegida" : folder.protection == "sync" ? ", sincronizada" : "")\(canEnter ? ", se puede abrir" : "")")
+                    }
+                }
+            }.frame(minHeight: 300)
+        }
+    }
+
     var folders: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 14) {
@@ -344,8 +428,18 @@ struct ContentView: View {
             }
             status
             if let report = model.report {
-                Text(report.root).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                HStack {
+                    Text(report.root).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                    Spacer()
+                    Picker("Vista", selection: $folderView) {
+                        Label("Lista", systemImage: "list.bullet.indent").tag("Lista")
+                        Label("Mapa", systemImage: "square.grid.3x3.square").tag("Mapa")
+                    }.pickerStyle(.segmented).labelsHidden().frame(width: 180)
+                }
                 let total = max(report.totalAllocated, 1)
+                if folderView == "Mapa" {
+                    treemap(report)
+                } else {
                 List(FolderNode.tree(report), children: \.children) { node in
                     let folder = node.folder
                     HStack(spacing: 10) {
@@ -364,11 +458,18 @@ struct ContentView: View {
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel("\(folder.name), \(size(folder.allocatedBytes))\(folder.protection == "sync" ? ", sincronizada" : folder.protection == "protected" ? ", protegida" : "")")
                 }.frame(minHeight: 260)
+                }
                 Text("Candado: protegida (sistema, configuración, dependencias). Nube: sincronizada. Ambas se miden pero no se ofrecen para limpieza. «+» indica que hubo elementos ilegibles y el total es un mínimo.")
                     .font(.caption).foregroundStyle(.secondary)
             } else if !model.busy {
-                ContentUnavailableView("Empieza por una carpeta", systemImage: "folder.badge.questionmark", description: Text("Elige, por ejemplo, tu carpeta personal. Verás cuánto ocupa cada carpeta, también las de Library y las dependencias de proyectos."))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                VStack(spacing: 16) {
+                    ContentUnavailableView("Empieza por una carpeta", systemImage: "folder.badge.questionmark", description: Text("Elige una carpeta o usa un atajo. Verás cuánto ocupa cada carpeta, también las de Library y las dependencias de proyectos. Analizar la carpeta personal completa tarda unos 3 minutos."))
+                    HStack {
+                        ForEach(AppModel.quickFolders(), id: \.path) { item in
+                            Button(item.title, systemImage: "folder") { model.scan(item.url) }
+                        }
+                    }
+                }.frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
@@ -542,6 +643,12 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 Table(filtered, selection: $selected) {
+                    TableColumn("") { entry in
+                        Toggle("", isOn: Binding(get: { selected.contains(entry.id) }, set: { on in if on { selected.insert(entry.id) } else { selected.remove(entry.id) } }))
+                            .toggleStyle(.checkbox).labelsHidden()
+                            .disabled(entry.classification.category != .review || entry.bytes == nil)
+                            .accessibilityLabel("Seleccionar \(entry.name)")
+                    }.width(24)
                     TableColumn("Archivo") { entry in
                         // La carpeta contenedora distingue elementos homónimos (por ejemplo, varios node_modules).
                         HStack(spacing: 6) {
@@ -557,7 +664,7 @@ struct ContentView: View {
                 if filtered.isEmpty { Text("No hay resultados para mostrar con estos filtros.").foregroundStyle(.secondary) }
             }
             HStack {
-                Text(selected.count > 1 ? "\(selected.count) seleccionados; solo los «Revisar antes de borrar» pueden ir a la Papelera." : "Selecciona varios con ⌘ o ⇧.").font(.caption).foregroundStyle(.secondary)
+                Text(selected.count > 1 ? "\(selected.count) seleccionados; solo los «Revisar antes de borrar» pueden ir a la Papelera." : "Marca las casillas (o usa ⌘/⇧ y clic) para elegir varios archivos «Revisar antes de borrar».").font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button("Mover a la Papelera (\(trashableSelection.count))…", systemImage: "trash") { model.prepare(files: trashableSelection) }
                     .disabled(trashableSelection.isEmpty || model.preparing || model.applying)
@@ -585,28 +692,51 @@ struct ContentView: View {
         }
     }
     var memory: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            HStack {
-                metric("RAM instalada", size(Int64(model.diagnostics.physicalMemory)), "memorychip")
-                metric("Memoria cableada", size(model.diagnostics.wiredMemory.map(Int64.init)), "lock")
+        let d = model.diagnostics
+        let pressureColor: Color = d.pressureLevel == 4 ? .red : d.pressureLevel == 2 ? .orange : accent
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(spacing: 14) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label("Presión de memoria", systemImage: "gauge.with.dots.needle.67percent").font(.caption).foregroundStyle(.secondary)
+                        Text(d.pressure ?? "No disponible").font(.title2.weight(.semibold)).foregroundStyle(pressureColor)
+                    }.frame(maxWidth: .infinity, alignment: .leading).padding(18)
+                        .background(pressureColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                        .accessibilityElement(children: .combine)
+                    metric("RAM instalada", size(Int64(d.physicalMemory)), "memorychip")
+                    metric("Intercambio en disco", size(d.swapUsed.map(Int64.init)), "internaldrive")
+                }
+                HStack(spacing: 14) {
+                    metric("Memoria cableada", size(d.wiredMemory.map(Int64.init)), "lock")
+                    metric("RAM ocupada por el compresor", size(d.compressedMemory.map(Int64.init)), "arrow.down.right.and.arrow.up.left")
+                }
+                GroupBox("Apps que más memoria usan") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        let maxBytes = Double(d.apps.first?.bytes ?? 1)
+                        ForEach(d.apps) { app in
+                            HStack(spacing: 10) {
+                                Text(app.name).lineLimit(1).frame(width: 220, alignment: .leading)
+                                ProgressView(value: Double(app.bytes), total: maxBytes)
+                                Text(size(Int64(app.bytes))).monospacedDigit().frame(width: 90, alignment: .trailing)
+                                Text("\(app.processes) \(app.processes == 1 ? "proceso" : "procesos")").font(.caption).foregroundStyle(.secondary).frame(width: 90, alignment: .trailing)
+                            }.accessibilityElement(children: .combine)
+                        }
+                        Text("Huella física por app, sumando sus procesos auxiliares (como la columna «Memoria» de Monitor de Actividad). \(d.hiddenProcesses) procesos del sistema no se pueden inspeccionar sin privilegios.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }.padding(8).frame(maxWidth: .infinity, alignment: .leading)
+                }
+                GroupBox("Cómo interpretar estos datos") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("La presión es la señal que usa macOS: «Normal» significa que hay memoria suficiente aunque parezca casi toda ocupada; «Advertencia», que comprime y usa disco a menudo; «Crítica», que falta memoria y el Mac puede ir lento.")
+                        Text("Si la presión no es normal, cerrar las apps de la lista que no estés usando es lo que más ayuda. Esta app no cierra procesos ni «libera RAM»: eso no acelera el Mac.")
+                        Button("Abrir Monitor de Actividad", systemImage: "waveform.path.ecg") {
+                            NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Activity Monitor.app"))
+                        }
+                    }.padding(8).frame(maxWidth: .infinity, alignment: .leading)
+                }
+                Text("Muestra: \(d.date.formatted(date: .abbreviated, time: .standard))").font(.caption).foregroundStyle(.secondary)
+                ForEach(d.errors, id: \.self) { Text($0).foregroundStyle(.orange) }
             }
-            HStack {
-                metric("RAM ocupada por el compresor", size(model.diagnostics.compressedMemory.map(Int64.init)), "arrow.down.right.and.arrow.up.left")
-                metric("Intercambio en disco", size(model.diagnostics.swapUsed.map(Int64.init)), "internaldrive")
-            }
-            GroupBox("Cómo interpretar estos datos") {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("La memoria cableada debe permanecer en RAM. El compresor reduce el espacio necesario para almacenar algunas páginas. El intercambio utiliza disco para apoyar la memoria virtual.")
-                    Text("Estas cifras son componentes, no deben sumarse como uso total. El intercambio acumulado por sí solo no demuestra lentitud.")
-                    Text("La presión de memoria no se calcula aquí. Para consultar su gráfica y el consumo por aplicación, abre Monitor de Actividad.")
-                    Button("Abrir Monitor de Actividad", systemImage: "waveform.path.ecg") {
-                        NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Activity Monitor.app"))
-                    }
-                }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
-            }
-            Text("Muestra: \(model.diagnostics.date.formatted(date: .abbreviated, time: .standard))").font(.caption).foregroundStyle(.secondary)
-            ForEach(model.diagnostics.errors, id: \.self) { Text($0).foregroundStyle(.orange) }
-            Spacer()
         }
     }
     func metric(_ title: String, _ value: String, _ icon: String) -> some View {

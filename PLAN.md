@@ -102,12 +102,17 @@ Hecho el 2026-11-17 (pedido por Jorge, al estilo de CleanMyMac):
 - Perfiles generales: cachés de apps (no las de macOS), registros, instaladores viejos en Descargas, copias de iPhone.
 - **Vaciar Papelera**, la única acción de borrado definitivo, autorizada expresamente por Jorge: va aparte de los planes, la hace Finder, tiene confirmación propia, no la propone ningún perfil ni la expone el MCP y está bloqueada en modo de prueba.
 
-Pendiente de esta versión:
+También hecho el 2026-11-17:
 
-- Validar la interfaz de punta a punta: selector, filtros, detalle, cancelación y teclado. Pendiente desde la 0.1.
-- Vista visual del árbol (treemap o sunburst) para la pestaña Almacenamiento.
-- RAM: presión de memoria real (`kern.memorystatus_vm_pressure_level` o `DISPATCH_SOURCE_TYPE_MEMORYPRESSURE`) y procesos que más consumen. Sin purgas ni cierres forzados.
-- Opcional: aviso cuando el disco baje de un umbral (LaunchAgent ligero). Solo si Jorge lo quiere; hoy está fuera del alcance.
+- **Mapa** (treemap «squarified») en Carpetas, con vista Lista/Mapa, clic para entrar en una carpeta y botón «Subir»; el resto de un nivel aparece como «Otros» para que las áreas sumen el total.
+- **Memoria RAM**: presión real de macOS (`kern.memorystatus_vm_pressure_level`: Normal, Advertencia o Crítica) y las 12 apps que más memoria usan (huella física por app, sumando sus procesos auxiliares). Sin purgas ni cierres.
+- **Selección y atajos**: casillas en Archivos (además de ⌘/⇧ y clic), menú «Analizar» con carpetas frecuentes (⌘⇧H personal, ⌘⇧L Descargas, ⌘⇧D Escritorio, ⌘⇧P Developer), ⌘O para elegir carpeta y ⌘R para el análisis inteligente, y botones de atajo en el estado vacío de Carpetas.
+
+Pendiente:
+
+- Recorrido visual de lo anterior: la pantalla estaba bloqueada cuando se iba a hacer.
+- Comprobación manual del selector de carpetas del sistema, que corre en otro proceso y no se puede automatizar.
+- Opcional: aviso cuando el disco baje de un umbral (LaunchAgent ligero). Solo si Jorge lo quiere.
 
 ## Decisiones que necesita Jorge
 
