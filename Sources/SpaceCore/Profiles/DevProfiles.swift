@@ -32,7 +32,10 @@ public enum DevProfiles {
     }
 
     public static func report(_ env: DevEnvironment = DevEnvironment()) -> DevReport {
+        let timing = DevEnvironment.testSetting("TIMING") != nil
+        let start = Date()
         let index = ProjectIndex.build(env)
+        if timing { FileHandle.standardError.write(Data(String(format: "índice de proyectos: %.1f s\n", Date().timeIntervalSince(start)).utf8)) }
         let builders: [@Sendable () -> ProfileResult] = [
             { androidSDK(env, index) }, { androidEmulators(env) }, { iosSimulators(env) }, { xcode(env) },
             { projectArtifacts(env, index) }, { jsPackages(env) }, { gradleMaven(env, index) }, { docker(env) },
@@ -41,7 +44,13 @@ public enum DevProfiles {
         ]
         // Los perfiles son independientes y casi todo es E/S: se miden en paralelo, conservando el orden.
         let box = ResultBox(count: builders.count)
-        DispatchQueue.concurrentPerform(iterations: builders.count) { i in box.set(i, builders[i]()) }
+        DispatchQueue.concurrentPerform(iterations: builders.count) { i in
+            let t0 = Date()
+            let result = builders[i]()
+            // MARGIN_TIMING=1: tiempo de cada perfil por la salida de error (diagnóstico de lentitud).
+            if timing { FileHandle.standardError.write(Data(String(format: "%@: %.1f s\n", result.id, Date().timeIntervalSince(t0)).utf8)) }
+            box.set(i, result)
+        }
         let profiles = box.values
         return DevReport(date: env.now, profiles: profiles, projectRoots: env.projectRoots.map(\.path), inactiveDays: env.inactiveDays)
     }
@@ -195,9 +204,9 @@ public enum DevProfiles {
             result.notes.append("No se pudo consultar `xcrun simctl` (¿Xcode no instalado?). Solo se mide la carpeta.")
         }
         let caches = "\(base)/Caches"
-        if env.isDirectory(caches), DiskUsage.measure(caches).allocated > 10_000_000 {
+        if env.isDirectory(caches), case let usage = DiskUsage.measure(caches), usage.allocated > 10_000_000 {
             result.items.append(.measured("ios-simulators", "Cachés de simuladores", path: caches, category: .lowRisk,
-                reason: "Cachés (por ejemplo, de dyld) que CoreSimulator regenera.", regenerate: "El primer arranque de cada simulador será más lento.", action: .trash(caches, note: "Con los simuladores apagados.", closed: [.simulator])))
+                reason: "Cachés (por ejemplo, de dyld) que CoreSimulator regenera.", regenerate: "El primer arranque de cada simulador será más lento.", action: .trash(caches, note: "Con los simuladores apagados.", closed: [.simulator]), usage: usage))
         }
         return result
     }
@@ -223,13 +232,13 @@ public enum DevProfiles {
                 regenerate: "Xcode lo vuelve a copiar al conectar un dispositivo con esa versión (tarda varios minutos).", action: .trash("\(support)/\(version)")))
         }
         let archives = "\(base)/Archives"
-        if env.isDirectory(archives), DiskUsage.measure(archives).allocated > 1_000_000 {
+        if env.isDirectory(archives), case let usage = DiskUsage.measure(archives), usage.allocated > 1_000_000 {
             result.items.append(.measured("xcode", "Archivos de publicación (Archives)", path: archives, category: .review,
-                reason: "Builds publicadas y sus símbolos.", regenerate: "No se regeneran: sin ellos no se pueden simbolizar fallos de esas versiones.", action: .trash(archives)))
+                reason: "Builds publicadas y sus símbolos.", regenerate: "No se regeneran: sin ellos no se pueden simbolizar fallos de esas versiones.", action: .trash(archives), usage: usage))
         }
         let cache = env.path("Library/Caches/com.apple.dt.Xcode")
-        if env.isDirectory(cache), DiskUsage.measure(cache).allocated > 10_000_000 {
-            result.items.append(.measured("xcode", "Caché de Xcode", path: cache, category: .lowRisk, reason: "Caché de la app.", regenerate: "Xcode la regenera.", action: .trash(cache, note: "Con Xcode cerrado.", closed: [.xcode])))
+        if env.isDirectory(cache), case let usage = DiskUsage.measure(cache), usage.allocated > 10_000_000 {
+            result.items.append(.measured("xcode", "Caché de Xcode", path: cache, category: .lowRisk, reason: "Caché de la app.", regenerate: "Xcode la regenera.", action: .trash(cache, note: "Con Xcode cerrado.", closed: [.xcode]), usage: usage))
         }
         return result
     }
@@ -247,6 +256,19 @@ public enum DevProfiles {
                 let touched = DevEnvironmentHelpers.recentTopLevelChange(artifact.project, ignoring: ProjectIndex.skip)
                 activity[key] = [commit, touched].compactMap { $0 }.max()
             }
+        }
+        // Medir node_modules, build… es lo más lento del análisis. Se mide en paralelo con una cola propia: un
+        // concurrentPerform dentro del de los perfiles se ejecutaría en serie.
+        let usages = UsageBox(count: index.artifacts.count)
+        let group = DispatchGroup()
+        let queue = DispatchQueue(label: "margin.artefactos", qos: .userInitiated, attributes: .concurrent)
+        for (i, artifact) in index.artifacts.enumerated() {
+            queue.async(group: group) { usages.set(i, DiskUsage.measure(artifact.path)) }
+        }
+        group.wait()
+        for (position, artifact) in index.artifacts.enumerated() {
+            let repo = index.repositories[artifact.project]
+            let key = repo ?? artifact.project
             let last = activity[key] ?? nil
             let days = env.days(since: last)
             let inactive = days.map { $0 >= env.inactiveDays } ?? false
@@ -257,7 +279,7 @@ public enum DevProfiles {
             result.items.append(.measured("project-artifacts", "\(projectName) · \(URL(fileURLWithPath: artifact.path).lastPathComponent)", path: artifact.path,
                 category: inactive ? .lowRisk : .protected,
                 reason: inactive ? reason : "Proyecto activo: no se propone. " + reason,
-                regenerate: artifact.regenerate, action: inactive ? .trash(artifact.path) : nil, lastUsed: last))
+                regenerate: artifact.regenerate, action: inactive ? .trash(artifact.path) : nil, lastUsed: last, usage: usages.values[position]))
         }
         let small = result.items.filter { ($0.bytes ?? 0) < 1_000_000 }
         result.items.removeAll { ($0.bytes ?? 0) < 1_000_000 }
@@ -273,15 +295,15 @@ public enum DevProfiles {
         var result = ProfileResult(id: "js-packages", name: "Cachés de paquetes JavaScript", owner: "pnpm / npm / yarn", detected: false)
         pnpmStores(env, into: &result)
         let npm = env.path(".npm/_cacache")
-        if env.isDirectory(npm), DiskUsage.measure(npm).allocated > 10_000_000 {
+        if env.isDirectory(npm), case let usage = DiskUsage.measure(npm), usage.allocated > 10_000_000 {
             result.detected = true
             result.items.append(.measured("js-packages", "Caché de npm", path: npm, category: .lowRisk, reason: "Copias de paquetes descargados por npm.",
-                regenerate: "npm los vuelve a descargar al instalar.", action: .run(["npm", "cache", "clean", "--force"])))
+                regenerate: "npm los vuelve a descargar al instalar.", action: .run(["npm", "cache", "clean", "--force"]), usage: usage))
         }
         for (path, title, command) in [(env.path("Library/Caches/Yarn"), "Caché de Yarn", ["yarn", "cache", "clean"]), (env.path(".bun/install/cache"), "Caché de Bun", ["bun", "pm", "cache", "rm"])] {
-            if env.isDirectory(path), DiskUsage.measure(path).allocated > 10_000_000 {
+            if env.isDirectory(path), case let usage = DiskUsage.measure(path), usage.allocated > 10_000_000 {
                 result.detected = true
-                result.items.append(.measured("js-packages", title, path: path, category: .lowRisk, reason: "Paquetes descargados.", regenerate: "Se vuelven a descargar al instalar.", action: .run(command)))
+                result.items.append(.measured("js-packages", title, path: path, category: .lowRisk, reason: "Paquetes descargados.", regenerate: "Se vuelven a descargar al instalar.", action: .run(command), usage: usage))
             }
         }
         return result
@@ -350,8 +372,8 @@ public enum DevProfiles {
             ("jdks", "JDK aprovisionados por Gradle", .review, "JDK descargados automáticamente por toolchains de Gradle.", "Gradle los vuelve a descargar si un proyecto los pide.")
         ] {
             let path = "\(gradle)/\(sub)"
-            if env.isDirectory(path), DiskUsage.measure(path).allocated > 10_000_000 {
-                result.items.append(.measured("gradle-maven", title, path: path, category: category, reason: reason, regenerate: regen, action: .trash(path, note: "Con los daemons detenidos: gradle --stop.", closed: [.gradle])))
+            if env.isDirectory(path), case let usage = DiskUsage.measure(path), usage.allocated > 10_000_000 {
+                result.items.append(.measured("gradle-maven", title, path: path, category: category, reason: reason, regenerate: regen, action: .trash(path, note: "Con los daemons detenidos: gradle --stop.", closed: [.gradle]), usage: usage))
             }
         }
         let m2 = env.path(".m2/repository")
@@ -441,16 +463,16 @@ public enum DevProfiles {
         var result = ProfileResult(id: "claude-desktop", name: "Claude Desktop", owner: "Claude", detected: env.isDirectory(base))
         guard result.detected else { return result }
         let vm = "\(base)/vm_bundles"
-        if env.isDirectory(vm), DiskUsage.measure(vm).allocated > 100_000_000 {
+        if env.isDirectory(vm), case let usage = DiskUsage.measure(vm), usage.allocated > 100_000_000 {
             result.items.append(.measured("claude-desktop", "Máquina virtual de Claude", path: vm, category: .review,
                 reason: "Imagen de la máquina virtual que usa la app para ejecutar tareas en un entorno aislado. No hay comando oficial para retirarla.",
-                regenerate: "La app la vuelve a descargar (varios GB) la próxima vez que la necesite.", action: .trash(vm, note: "Con Claude cerrado.", closed: [.claude])))
+                regenerate: "La app la vuelve a descargar (varios GB) la próxima vez que la necesite.", action: .trash(vm, note: "Con Claude cerrado.", closed: [.claude]), usage: usage))
         }
         for (sub, title) in [("Cache", "Caché de la app"), ("Code Cache", "Caché de código de la app")] {
             let path = "\(base)/\(sub)"
-            if env.isDirectory(path), DiskUsage.measure(path).allocated > 50_000_000 {
+            if env.isDirectory(path), case let usage = DiskUsage.measure(path), usage.allocated > 50_000_000 {
                 result.items.append(.measured("claude-desktop", title, path: path, category: .lowRisk, reason: "Caché de Electron (recursos web y código compilado).",
-                    regenerate: "La app la regenera; el primer arranque será algo más lento.", action: .trash(path, note: "Con Claude cerrado.", closed: [.claude])))
+                    regenerate: "La app la regenera; el primer arranque será algo más lento.", action: .trash(path, note: "Con Claude cerrado.", closed: [.claude]), usage: usage))
             }
         }
         return result
@@ -489,8 +511,8 @@ public enum DevProfiles {
         }
         for sub in ["Cache", "CachedData", "CachedExtensionVSIXs", "Code Cache"] {
             let path = env.path("Library/Application Support/Code/\(sub)")
-            if env.isDirectory(path), DiskUsage.measure(path).allocated > 50_000_000 {
-                result.items.append(.measured("vscode", "VS Code · \(sub)", path: path, category: .lowRisk, reason: "Caché de la app.", regenerate: "VS Code la regenera.", action: .trash(path, note: "Con VS Code cerrado.", closed: [.vscode])))
+            if env.isDirectory(path), case let usage = DiskUsage.measure(path), usage.allocated > 50_000_000 {
+                result.items.append(.measured("vscode", "VS Code · \(sub)", path: path, category: .lowRisk, reason: "Caché de la app.", regenerate: "VS Code la regenera.", action: .trash(path, note: "Con VS Code cerrado.", closed: [.vscode]), usage: usage))
             }
         }
         return result
@@ -553,4 +575,12 @@ enum DevEnvironmentHelpers {
         }
         return 0
     }
+}
+
+private final class UsageBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [Usage?]
+    init(count: Int) { storage = Array(repeating: nil, count: count) }
+    func set(_ index: Int, _ value: Usage) { lock.withLock { storage[index] = value } }
+    var values: [Usage?] { lock.withLock { storage } }
 }
