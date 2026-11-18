@@ -335,3 +335,16 @@ Hechas con clics sobre una carpeta personal sintética, sin ejecutar ningún pla
 - Encima de la lista de restos hay una casilla de grupo: «Select all», con el total («8 leftovers · 943.1 MB» con datos reales). Si hay una búsqueda, dice «Select all matching» y solo afecta a los restos visibles.
 - Es un `Toggle(sources:)` de SwiftUI, así que macOS dibuja el estado mixto real (guion) cuando solo hay algunos marcados. Un primer intento con un icono superpuesto se veía como un cuadrado relleno, sin guion, y se descartó.
 - Con clics en la app real: marcar Whisky deja la casilla con guion y la barra flotante en «1 item in the plan · 822 MB»; pulsarla marca los 8 («8 items in the plan · 943.1 MB»); pulsarla otra vez los desmarca y la barra desaparece. Buscando «openai» dice «Select all matching · 2 leftovers · 14.4 MB». No se creó ni se aplicó ningún plan.
+
+## Vaciar Papelera siempre a mano y borrado definitivo opcional (18-11-2026)
+
+- **Pruebas**: 80, todas bien. Cuatro nuevas para el borrado definitivo:
+  - borra sin usar la Papelera, el registro anota `removed` y el informe no dice «Papelera»;
+  - un proyecto que cambió se bloquea igual que sin el ajuste;
+  - si un borrado falla, el archivo se queda y no pasa a la Papelera a escondidas;
+  - un ejecutor que no sabe borrar definitivamente falla sin tocar nada.
+- El ejecutor falso de las pruebas solo borra dentro de su carpeta sintética (`precondition`).
+- **App, con clics** (sin vaciar ni borrar nada real):
+  - La tarjeta «Papelera» aparece en Inicio sin haber analizado. «Vaciar Papelera…» y «Ver tamaño…» van uno debajo del otro, porque juntos recortaban el botón.
+  - Margin › «Vaciar Papelera…» (⇧⌘⌫) abre la confirmación; se canceló. El registro sigue con un único vaciado, de las 08:39 UTC, anterior a estas pruebas.
+  - **Fallo encontrado**: el diálogo del sistema dejaba en rojo, como botón predeterminado, «Vaciar definitivamente», así que Retorno habría vaciado la Papelera. `.keyboardShortcut(.defaultAction)` en Cancelar no lo cambia, y no se comprobó pulsando Retorno para no vaciar la Papelera real. Se sustituyó por una confirmación propia (`DestructiveConfirmation`), en la que Retorno y Escape cancelan; también se usa al activar el borrado definitivo.

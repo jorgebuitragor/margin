@@ -13,7 +13,6 @@ struct ContentView: View {
         get { model.tab }
         nonmutating set { model.tab = newValue }
     }
-    @State var confirmEmpty = false
     // MARGIN_VIEW abre la vista de mapa al arrancar (pruebas visuales sin clics).
     @State var folderView = DevEnvironment.testSetting("VIEW") ?? "Lista"
     @State var mapRoot: String?
@@ -28,6 +27,7 @@ struct ContentView: View {
     @AppStorage(Pref.colorblind) var colorblind = false
     @AppStorage(Pref.highContrast) var highContrast = false
     @AppStorage(Pref.reduceMotion) var reduceMotionSetting = false
+    @AppStorage(Pref.permanentDelete) var permanentDelete = false
     @Environment(\.accessibilityReduceMotion) var systemReduceMotion
 
     var palette: Palette { Palette(colorblind: colorblind, highContrast: highContrast) }
@@ -51,6 +51,8 @@ struct ContentView: View {
         .transaction { if reduceMotion { $0.animation = nil; $0.disablesAnimations = true } }
         .symbolEffectsRemoved(reduceMotion)
         .onChange(of: model.tab) { bounces[model.tab, default: 0] += 1 }
+        // Al volver a Margin (quizá tras vaciar la Papelera en Finder) se relee su tamaño.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in model.refreshTrash() }
         // Un análisis nuevo (u otra carpeta) invalida la navegación del mapa y la selección: los elementos marcados
         // pertenecían al informe anterior y no deben ir a parar a un plan sin que se vean.
         .onChange(of: model.report?.root) { mapRoot = nil; selected.removeAll() }
@@ -59,11 +61,13 @@ struct ContentView: View {
             model.showTabs = nil
         }
         .sheet(item: $model.pendingPlan) { plan in confirmation(plan) }
-        .alert(t("¿Vaciar la Papelera?"), isPresented: $confirmEmpty) {
-            Button(t("Cancelar"), role: .cancel) {}
-            Button(t("Vaciar definitivamente"), role: .destructive) { model.emptyTrash() }
-        } message: {
-            Text((model.trash?.items.map { t("Se borrarán %@ (%@). ", tn($0, "elemento", "elementos"), size(model.trash?.bytes)) } ?? "") + t("Lo que hay en la Papelera se borra para siempre y no se puede recuperar. Finder se encarga de vaciarla; la primera vez macOS te pedirá permiso para que esta app controle Finder."))
+        .sheet(isPresented: $model.confirmEmpty) {
+            DestructiveConfirmation(
+                title: t("¿Vaciar la Papelera?"),
+                message: (model.trash?.items.map { t("Se borrarán %@ (%@). ", tn($0, "elemento", "elementos"), size(model.trash?.bytes)) } ?? "") + t("Lo que hay en la Papelera se borra para siempre y no se puede recuperar. Finder se encarga de vaciarla; la primera vez macOS te pedirá permiso para que esta app controle Finder."),
+                actionTitle: t("Vaciar definitivamente"), danger: palette.danger,
+                onCancel: { model.confirmEmpty = false },
+                onConfirm: { model.confirmEmpty = false; model.emptyTrash() })
         }
         .alert(model.emptyResult?.status == .done ? t("Papelera vaciada") : t("No se pudo vaciar la Papelera"), isPresented: Binding(get: { model.emptyResult != nil }, set: { if !$0 { model.emptyResult = nil } })) {
             Button(t("Aceptar"), role: .cancel) {}
@@ -109,13 +113,25 @@ struct ContentView: View {
                         .help(t("Margin analiza %@ en lugar de tu carpeta personal: casi todo el disco aparece como «Otros».", home))
                         .padding(.bottom, 6)
                 }
+                if permanentDelete {
+                    // Mientras esté activado se ve siempre, para no olvidar que nada pasa por la Papelera.
+                    Button { model.tab = "Ajustes" } label: {
+                        Label(t("Borrado definitivo activado"), systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption.weight(.semibold)).foregroundStyle(palette.danger)
+                    }
+                    .buttonStyle(.plain)
+                    .help(t("Los planes borran sin pasar por la Papelera. Se desactiva en Ajustes."))
+                    .padding(.bottom, 4)
+                }
                 Label(t("Nada sin tu confirmación"), systemImage: "checkmark.shield.fill")
                     .font(.callout.weight(.medium)).foregroundStyle(accent)
                 Text(t("Versión %@", "0.9")).font(.caption2).foregroundStyle(.tertiary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 18).padding(.vertical, 14)
-            .help(t("Solo Papelera o el comando oficial de cada herramienta. El único borrado definitivo es «Vaciar Papelera»."))
+            .help(permanentDelete
+                  ? t("Borrado definitivo activado: los planes borran sin pasar por la Papelera.")
+                  : t("Solo Papelera o el comando oficial de cada herramienta. El único borrado definitivo es «Vaciar Papelera»."))
         }
         .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
     }
@@ -231,8 +247,15 @@ struct ContentView: View {
     func confirmation(_ plan: Plan) -> some View {
         let runnable = plan.steps.filter { model.blockers[$0.id] == nil }
         let hasReview = runnable.contains { $0.category == .review }
+        let permanent = permanentDelete && runnable.contains { $0.action.kind == .trash }
         return VStack(alignment: .leading, spacing: 14) {
             Text(t("Revisa el plan")).font(.title2.bold())
+            if permanent {
+                Label(t("Borrado definitivo activado: lo que este plan borre no pasará por la Papelera y no se podrá recuperar. Se desactiva en Ajustes."), systemImage: "exclamationmark.triangle.fill")
+                    .font(.callout.weight(.medium)).foregroundStyle(palette.danger)
+                    .padding(10).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(palette.danger.opacity(0.12), in: .rect(cornerRadius: 10))
+            }
             Text(t("Recuperable estimado %@. Cada paso se vuelve a comprobar justo antes de actuar.", size(plan.recoverable))).foregroundStyle(.secondary)
             List(plan.steps) { step in
                 VStack(alignment: .leading, spacing: 4) {
@@ -243,14 +266,18 @@ struct ContentView: View {
                         Spacer()
                         Text(size(step.recoverable)).monospacedDigit()
                     }
-                    Text(step.action.kind == .trash ? t("Mover a la Papelera: %@", step.action.paths.count == 1 ? step.action.paths[0] : tn(step.action.paths.count, "ruta", "rutas")) : t("Ejecutar: %@", step.action.command))
+                    let target = step.action.paths.count == 1 ? step.action.paths[0] : tn(step.action.paths.count, "ruta", "rutas")
+                    let deletes = permanentDelete && !step.action.paths.contains { $0.hasPrefix("/Applications/") }
+                    Text(step.action.kind == .trash ? (deletes ? t("Borrar definitivamente: %@", target) : t("Mover a la Papelera: %@", target)) : t("Ejecutar: %@", step.action.command))
                         .font(.system(.caption, design: .monospaced)).textSelection(.enabled)
                     Text(t("Si se retira: %@", step.regenerate)).font(.caption).foregroundStyle(.secondary)
                     if let note = step.action.note { Text(note).font(.caption).foregroundStyle(palette.warning) }
                     if let blocker = model.blockers[step.id] { Text(t("No se ejecutará: %@", blocker)).font(.caption).foregroundStyle(palette.danger) }
                 }.padding(.vertical, 4)
             }.frame(minHeight: 240)
-            Text(t("Lo que vaya a la Papelera se recupera desde Finder hasta que la vacíes. Los comandos de las herramientas no se pueden deshacer.")).font(.caption)
+            Text(permanent
+                 ? t("Lo borrado definitivamente no se puede recuperar. Las apps de /Applications van a la Papelera. Los comandos de las herramientas no se pueden deshacer.")
+                 : t("Lo que vaya a la Papelera se recupera desde Finder hasta que la vacíes. Los comandos de las herramientas no se pueden deshacer.")).font(.caption)
             if hasReview {
                 Toggle(t("Entiendo que hay elementos marcados «Revisar antes de borrar» y los he revisado"), isOn: $acceptReview)
             }
@@ -275,9 +302,17 @@ struct ContentView: View {
                 }
             }.frame(minHeight: 200)
             Text(t("Espacio disponible: antes %@, después %@.", size(report.availableBefore), size(report.availableAfter)) + (report.freedObserved.map { " (\($0 >= 0 ? "+" : "")\(formatBytes($0)))" } ?? ""))
+            if report.removedCount > 0 { Text(t("%@ sin pasar por la Papelera.", tn(report.removedCount, "ruta borrada", "rutas borradas"))).foregroundStyle(palette.danger) }
             if report.usedTrash { Text(t("Lo movido a la Papelera no libera espacio hasta que la vacíes.")).foregroundStyle(palette.warning) }
             HStack {
                 Spacer()
+                if report.usedTrash {
+                    // Se cierra el resultado y luego se pregunta: el diálogo no puede abrirse mientras la hoja se va.
+                    Button(t("Vaciar Papelera…"), role: .destructive) {
+                        model.applyReport = nil
+                        Task { try? await Task.sleep(for: .milliseconds(400)); model.askEmptyTrash() }
+                    }
+                }
                 Button(t("Cerrar")) { model.applyReport = nil }.keyboardShortcut(.defaultAction)
             }
         }.padding(24).frame(width: 640, height: 480)

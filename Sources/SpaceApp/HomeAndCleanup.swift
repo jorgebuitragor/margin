@@ -67,6 +67,11 @@ extension ContentView {
                     .frame(maxWidth: .infinity).padding(.vertical, 36)
                     .surface(cornerRadius: 22, highContrast: highContrast)
                     .transition(.opacity)
+                    // La Papelera no depende del análisis: se puede vaciar desde el primer momento.
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 14) {
+                        trashCard
+                    }
+                    .transition(.opacity)
                 }
             }
             .padding(.horizontal, 28).padding(.top, 12).padding(.bottom, 90)
@@ -95,8 +100,9 @@ extension ContentView {
     var trashCard: some View {
         card(t("Papelera"), "trash", primary: model.trash?.bytes.map { size($0) } ?? t("Tamaño desconocido"),
              detail: model.trash?.items.map { t("%@ · se libera al vaciarla", tn($0, "elemento", "elementos")) } ?? t("macOS no deja leerla sin «Acceso total al disco»")) {
-            HStack {
-                Button(model.emptying ? t("Vaciando…") : t("Vaciar Papelera…"), systemImage: "trash", role: .destructive) { confirmEmpty = true }
+            // Uno debajo del otro: en una tarjeta estrecha, juntos recortaban «Vaciar Papelera…».
+            VStack(alignment: .leading, spacing: 6) {
+                Button(model.emptying ? t("Vaciando…") : t("Vaciar Papelera…"), systemImage: "trash", role: .destructive) { model.askEmptyTrash() }
                     .symbolEffect(.bounce, value: model.emptyResult?.date)
                     .disabled(model.emptying || model.trash?.items == 0)
                 if model.trash?.bytes == nil {

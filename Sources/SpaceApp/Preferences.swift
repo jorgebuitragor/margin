@@ -18,6 +18,8 @@ enum Pref {
     static let alertThreshold = "avisoUmbralGB"
     static let alertLastDate = "avisoUltimo"
     static let alertLastAvailable = "avisoUltimoDisponible"
+    /// Los planes borran sin pasar por la Papelera. Apagado por defecto; se activa en Ajustes con confirmación.
+    static let permanentDelete = "borradoDefinitivo"
 }
 
 enum Preferences {
@@ -27,7 +29,8 @@ enum Preferences {
         defaults.register(defaults: [
             Pref.language: "sistema", Pref.theme: "sistema", Pref.startTab: "Inicio", Pref.measureOnLaunch: true,
             Pref.smartOnLaunch: false, Pref.inactiveDays: 30, Pref.projectRoots: "", Pref.colorblind: false,
-            Pref.highContrast: false, Pref.reduceMotion: false, Pref.alertEnabled: false, Pref.alertThreshold: 15
+            Pref.highContrast: false, Pref.reduceMotion: false, Pref.alertEnabled: false, Pref.alertThreshold: 15,
+            Pref.permanentDelete: false
         ])
     }
 

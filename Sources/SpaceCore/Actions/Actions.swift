@@ -75,6 +75,9 @@ public struct StepResult: Codable, Sendable {
     public let status: Status
     public let message: String
     public var trashed: [String] = []
+    /// Rutas borradas sin pasar por la Papelera (solo con el ajuste «Borrar definitivamente»). Opcional para leer
+    /// resultados guardados antes de que existiera.
+    public var removed: [String]?
     public var failures: [String: String] = [:]
     /// Últimas líneas de la salida del comando (máx. 4 KB).
     public var output: String?
@@ -89,6 +92,8 @@ public struct ApplyReport: Codable, Sendable {
     public var results: [StepResult]
     /// Algo fue a la Papelera: ese espacio no se libera hasta vaciarla.
     public var usedTrash: Bool { results.contains { !$0.trashed.isEmpty } }
+    /// Cuántas rutas se borraron sin pasar por la Papelera.
+    public var removedCount: Int { results.reduce(0) { $0 + ($1.removed?.count ?? 0) } }
     public var freedObserved: Int64? {
         guard let before = availableBefore, let after = availableAfter else { return nil }
         return after - before
@@ -116,11 +121,20 @@ public enum PlanError: LocalizedError {
 
 // MARK: Ejecutor
 
-/// Las dos únicas operaciones de escritura del programa. No existe borrado permanente.
+/// Las operaciones de escritura del programa: mover a la Papelera, ejecutar el comando oficial de una herramienta y,
+/// solo si el usuario activa «Borrar definitivamente» en los Ajustes de la app (apagado por defecto), borrar sin pasar
+/// por la Papelera. La CLI y el servidor MCP nunca borran definitivamente.
 public protocol ActionExecutor: Sendable {
     /// Mueve a la Papelera. Devuelve la ruta resultante dentro de la Papelera.
     func trash(_ path: String) throws -> String?
+    /// Borra definitivamente, sin pasar por la Papelera.
+    func remove(_ path: String) throws
     func run(_ executable: String, _ arguments: [String]) -> CommandResult?
+}
+
+extension ActionExecutor {
+    /// Por defecto un ejecutor no sabe borrar definitivamente: falla y el archivo se queda donde estaba.
+    public func remove(_ path: String) throws { throw CocoaError(.featureUnsupported) }
 }
 
 public struct SystemExecutor: ActionExecutor {
@@ -147,6 +161,9 @@ public struct SystemExecutor: ActionExecutor {
         guard result.status == 0 else {
             throw FinderError(errorDescription: loc("Finder no pudo moverla a la Papelera (¿cancelaste la contraseña?): \(result.error.trimmingCharacters(in: .whitespacesAndNewlines))", "Finder couldn't move it to the Trash (did you cancel the password?): \(result.error.trimmingCharacters(in: .whitespacesAndNewlines))"))
         }
+    }
+    public func remove(_ path: String) throws {
+        try FileManager.default.removeItem(atPath: path)
     }
     public func run(_ executable: String, _ arguments: [String]) -> CommandResult? {
         ProcessRunner().run(executable, arguments, timeout: 30 * 60)
@@ -179,8 +196,8 @@ public enum PlanStore {
 
     /// Registro local de acciones, una línea JSON por paso. Sin contenido de archivos.
     static func log(_ result: StepResult, plan: Plan, availableBefore: Int64?, _ env: DevEnvironment) {
-        struct Line: Encodable { let date: Date; let plan: String; let step: String; let title: String; let status: String; let message: String; let trashed: [String]; let failures: [String: String]; let availableBefore: Int64? }
-        let line = Line(date: Date(), plan: plan.id, step: result.stepID, title: result.title, status: result.status.rawValue, message: result.message, trashed: result.trashed, failures: result.failures, availableBefore: availableBefore)
+        struct Line: Encodable { let date: Date; let plan: String; let step: String; let title: String; let status: String; let message: String; let trashed: [String]; let removed: [String]?; let failures: [String: String]; let availableBefore: Int64? }
+        let line = Line(date: Date(), plan: plan.id, step: result.stepID, title: result.title, status: result.status.rawValue, message: result.message, trashed: result.trashed, removed: result.removed, failures: result.failures, availableBefore: availableBefore)
         let compact = JSONEncoder()
         compact.dateEncodingStrategy = .iso8601
         compact.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
@@ -325,7 +342,9 @@ public enum Planner {
     }
 
     /// Ejecuta un plan ya confirmado por el usuario. Cada paso se revalida justo antes de actuar.
-    public static func apply(_ plan: Plan, env: DevEnvironment, executor: ActionExecutor = SystemExecutor(), progress: (StepResult) -> Void = { _ in }) throws -> ApplyReport {
+    /// `permanent` borra sin pasar por la Papelera (ajuste de la app, apagado por defecto); las comprobaciones son las
+    /// mismas, y las apps de /Applications van a la Papelera igualmente (ver `trash`).
+    public static func apply(_ plan: Plan, env: DevEnvironment, executor: ActionExecutor = SystemExecutor(), permanent: Bool = false, progress: (StepResult) -> Void = { _ in }) throws -> ApplyReport {
         if PlanStore.isApplied(plan.id, env) { throw PlanError.alreadyApplied }
         if env.now.timeIntervalSince(plan.created) > maxAge { throw PlanError.expired }
         var report = ApplyReport(planID: plan.id, started: Date(), finished: Date(), availableBefore: available(env), availableAfter: nil, results: [])
@@ -335,7 +354,7 @@ public enum Planner {
             if let reason = blocker(step, plan: plan, env: env, freshProfiles: &fresh) {
                 result = StepResult(stepID: step.id, title: step.title, status: .blocked, message: reason)
             } else if step.action.kind == .trash {
-                result = trash(step, executor: executor)
+                result = trash(step, executor: executor, permanent: permanent)
             } else {
                 result = command(step, env: env, executor: executor)
             }
@@ -351,24 +370,43 @@ public enum Planner {
         return report
     }
 
-    static func trash(_ step: PlanStep, executor: ActionExecutor) -> StepResult {
-        var result = StepResult(stepID: step.id, title: step.title, status: .done, message: "")
+    static func trash(_ step: PlanStep, executor: ActionExecutor, permanent: Bool = false) -> StepResult {
+        var trashed: [String] = []
+        var removed: [String] = []
+        var failures: [String: String] = [:]
         for path in step.action.paths {
-            // Última comprobación inmediatamente antes de mover.
+            // Última comprobación inmediatamente antes de actuar.
             guard let now = FileIdentity.of(path), let planned = step.identities[path], now.sameObject(as: planned) else {
-                result.failures[path] = loc("Cambió justo antes de moverlo; no se tocó.", "Changed right before moving it; it wasn't touched.")
+                failures[path] = loc("Cambió justo antes de moverlo; no se tocó.", "Changed right before moving it; it wasn't touched.")
                 continue
             }
-            do {
-                _ = try executor.trash(path)
-                result.trashed.append(path)
-            } catch {
-                result.failures[path] = error.localizedDescription // Nunca se recurre al borrado permanente.
+            // Una app de /Applications va siempre a la Papelera: suele ser de root o de la App Store, y un borrado a
+            // medias por falta de permisos la dejaría rota. Finder la mueve pidiendo la contraseña.
+            if permanent && !path.hasPrefix("/Applications/") {
+                do {
+                    try executor.remove(path)
+                    removed.append(path)
+                } catch {
+                    failures[path] = error.localizedDescription // Si falla no se cambia a la Papelera sin avisar.
+                }
+            } else {
+                do {
+                    _ = try executor.trash(path)
+                    trashed.append(path)
+                } catch {
+                    failures[path] = error.localizedDescription // Nunca se recurre al borrado permanente.
+                }
             }
         }
-        let status: StepResult.Status = result.failures.isEmpty ? .done : result.trashed.isEmpty ? .failed : .partial
-        let message = status == .done ? loc("Movido a la Papelera (\(result.trashed.count)).", "Moved to the Trash (\(result.trashed.count)).") : loc("\(result.trashed.count) movidos, \(result.failures.count) con error.", "\(result.trashed.count) moved, \(result.failures.count) with errors.")
-        return StepResult(stepID: step.id, title: step.title, status: status, message: message, trashed: result.trashed, failures: result.failures)
+        let acted = trashed.count + removed.count
+        let status: StepResult.Status = failures.isEmpty ? .done : acted == 0 ? .failed : .partial
+        var parts: [String] = []
+        if !removed.isEmpty { parts.append(loc("borrado definitivamente (\(removed.count))", "permanently deleted (\(removed.count))")) }
+        if !trashed.isEmpty { parts.append(loc("movido a la Papelera (\(trashed.count))", "moved to the Trash (\(trashed.count))")) }
+        if !failures.isEmpty { parts.append(loc("\(failures.count) con error", "\(failures.count) with errors")) }
+        let text = parts.joined(separator: ", ")
+        let message = text.isEmpty ? "" : text.prefix(1).uppercased() + text.dropFirst() + "."
+        return StepResult(stepID: step.id, title: step.title, status: status, message: message, trashed: trashed, removed: removed.isEmpty ? nil : removed, failures: failures)
     }
 
     static func command(_ step: PlanStep, env: DevEnvironment, executor: ActionExecutor) -> StepResult {

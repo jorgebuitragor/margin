@@ -17,6 +17,8 @@ struct SettingsPane: View {
     @AppStorage(Pref.reduceMotion) var reduceMotion = false
     @AppStorage(Pref.alertEnabled) var alertEnabled = false
     @AppStorage(Pref.alertThreshold) var alertThreshold = 15
+    @AppStorage(Pref.permanentDelete) var permanentDelete = false
+    @State var confirmPermanent = false
     @State var alertError: String?
     @State var hasFullDiskAccess = TrashStatus.read(appEnvironment()).bytes != nil
     let palette: Palette
@@ -118,6 +120,29 @@ struct SettingsPane: View {
                 Text(t("Aviso de poco espacio"))
             } footer: {
                 Text(t("Margin lo comprueba cada hora en segundo plano (solo lee el espacio libre) y avisa como mucho una vez al día, salvo que siga bajando. Al desactivarlo se retira el agente de inicio."))
+            }
+            Section {
+                Toggle(t("Borrar definitivamente, sin pasar por la Papelera"), isOn: Binding(get: { permanentDelete }, set: { on in
+                    if on { confirmPermanent = true } else { permanentDelete = false }
+                }))
+                // El riesgo se muestra siempre, esté activado o no.
+                Label(permanentDelete
+                      ? t("Activado: lo que borre un plan no se podrá recuperar. Un error al elegir es definitivo.")
+                      : t("Riesgo: si lo activas, lo que borre un plan no se podrá recuperar desde la Papelera. Recomendado dejarlo desactivado."),
+                      systemImage: "exclamationmark.triangle.fill")
+                    .font(.callout).foregroundStyle(permanentDelete ? palette.danger : palette.warning)
+            } header: {
+                Text(t("Borrado definitivo"))
+            } footer: {
+                Text(t("Desactivado, Margin mueve todo a la Papelera y puedes recuperarlo hasta que la vacíes. Activado, los planes de la app borran directamente; las comprobaciones de seguridad son las mismas. Las apps de /Applications van siempre a la Papelera, y la terminal y el servidor MCP nunca borran definitivamente."))
+            }
+            .sheet(isPresented: $confirmPermanent) {
+                DestructiveConfirmation(
+                    title: t("¿Activar el borrado definitivo?"),
+                    message: t("Los planes borrarán sin pasar por la Papelera: no podrás recuperar nada desde Finder ni deshacerlo. Margin te lo recordará en cada plan. Puedes desactivarlo aquí cuando quieras."),
+                    actionTitle: t("Activar"), danger: palette.danger,
+                    onCancel: { confirmPermanent = false },
+                    onConfirm: { confirmPermanent = false; permanentDelete = true })
             }
             Section(t("Datos")) {
                 LabeledContent(t("Carpeta de datos"), value: appEnvironment().supportDirectory.replacingOccurrences(of: NSHomeDirectory(), with: "~"))

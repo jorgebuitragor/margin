@@ -48,6 +48,13 @@ struct MarginApp: App {
             CommandGroup(replacing: .appSettings) {
                 Button(t("Ajustes…")) { model.tab = "Ajustes" }.keyboardShortcut(",", modifiers: .command)
             }
+            // El mismo atajo que en Finder; siempre pide confirmación antes de borrar nada.
+            CommandGroup(after: .appSettings) {
+                Divider()
+                Button(model.emptying ? t("Vaciando…") : t("Vaciar Papelera…")) { model.askEmptyTrash() }
+                    .keyboardShortcut(.delete, modifiers: [.command, .shift])
+                    .disabled(model.emptying)
+            }
             // ⌘1…⌘5 saltan entre secciones sin tocar el ratón.
             CommandGroup(before: .sidebar) {
                 ForEach(Array(ContentView.tabs.enumerated()), id: \.element.id) { index, item in

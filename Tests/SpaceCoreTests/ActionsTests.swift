@@ -6,6 +6,7 @@ final class FakeExecutor: ActionExecutor, @unchecked Sendable {
     let trashDir: URL
     var failing: Set<String> = []
     private(set) var trashed: [String] = []
+    private(set) var removed: [String] = []
     private(set) var commands: [[String]] = []
     var commandStatus: Int32 = 0
     init(trashDir: URL) { self.trashDir = trashDir }
@@ -16,6 +17,13 @@ final class FakeExecutor: ActionExecutor, @unchecked Sendable {
         try FileManager.default.moveItem(atPath: path, toPath: target.path)
         trashed.append(path)
         return target.path
+    }
+    /// Borra de verdad, pero solo dentro de la carpeta sintética de la prueba.
+    func remove(_ path: String) throws {
+        if failing.contains(path) { throw CocoaError(.fileWriteNoPermission) }
+        precondition(path.hasPrefix("/private/tmp/acthome-"), "Las pruebas solo borran en su carpeta sintética")
+        try FileManager.default.removeItem(atPath: path)
+        removed.append(path)
     }
     func run(_ executable: String, _ arguments: [String]) -> CommandResult? {
         commands.append([URL(fileURLWithPath: executable).lastPathComponent] + arguments)
@@ -169,6 +177,60 @@ final class ActionsTests: XCTestCase {
         XCTAssertNotNil(result.failures[failing])
         XCTAssertTrue(FileManager.default.fileExists(atPath: failing), "Un fallo de Papelera deja el archivo en su sitio")
         XCTAssertTrue(FileManager.default.fileExists(atPath: home.appendingPathComponent(".vscode/extensions/acme.tool-1.2.0").path))
+    }
+
+    func testPermanentModeDeletesWithoutTrash() throws {
+        try oldProject()
+        let env = env()
+        let modules = home.appendingPathComponent("Developer/viejo/node_modules").path
+        let report = try Planner.apply(try Planner.plan(devItems: [try item(env, "viejo · node_modules")], env: env), env: env, executor: executor, permanent: true)
+        let result = try XCTUnwrap(report.results.first)
+        XCTAssertEqual(result.status, .done, result.message)
+        XCTAssertEqual(executor.removed, [modules])
+        XCTAssertTrue(executor.trashed.isEmpty, "En modo definitivo no se usa la Papelera")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: modules))
+        XCTAssertFalse(report.usedTrash)
+        XCTAssertEqual(report.removedCount, 1)
+        XCTAssertTrue(result.message.contains("definitiv"))
+        let log = try String(contentsOfFile: "\(env.supportDirectory)/acciones.jsonl", encoding: .utf8)
+        XCTAssertTrue(log.contains("\"removed\""), "El registro dice qué se borró definitivamente")
+    }
+
+    func testPermanentModeKeepsTheSameSafetyChecks() throws {
+        try oldProject()
+        let env = env()
+        let plan = try Planner.plan(devItems: [try item(env, "viejo · node_modules")], env: env)
+        try file("Developer/viejo/package.json", 0, "{\"name\":\"editado hoy\"}")
+        let report = try Planner.apply(plan, env: env, executor: executor, permanent: true)
+        XCTAssertEqual(report.results.first?.status, .blocked)
+        XCTAssertTrue(executor.removed.isEmpty)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: home.appendingPathComponent("Developer/viejo/node_modules").path))
+    }
+
+    func testPermanentFailureNeverFallsBackSilently() throws {
+        try file(".vscode/extensions/acme.tool-1.0.0/package.json", 2_000)
+        try file(".vscode/extensions/acme.tool-1.1.0/package.json", 2_000)
+        try file(".vscode/extensions/acme.tool-1.2.0/package.json", 2_000)
+        let env = env()
+        let failing = home.appendingPathComponent(".vscode/extensions/acme.tool-1.0.0").path
+        executor.failing = [failing]
+        let report = try Planner.apply(try Planner.plan(devItems: [try item(env, "versiones antiguas")], env: env), env: env, executor: executor, permanent: true)
+        let result = try XCTUnwrap(report.results.first)
+        XCTAssertEqual(result.status, .partial)
+        XCTAssertEqual(result.removed?.count, 1)
+        XCTAssertTrue(result.trashed.isEmpty, "Un fallo no manda el archivo a la Papelera a escondidas")
+        XCTAssertNotNil(result.failures[failing])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: failing))
+    }
+
+    func testDefaultExecutorCannotDeletePermanently() throws {
+        struct OnlyTrash: ActionExecutor {
+            func trash(_ path: String) throws -> String? { nil }
+            func run(_ executable: String, _ arguments: [String]) -> CommandResult? { nil }
+        }
+        let url = try file("Descargas/x.zip", 100)
+        XCTAssertThrowsError(try OnlyTrash().remove(url.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
     }
 
     func testRunningAppBlocksAction() throws {

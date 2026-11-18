@@ -145,9 +145,10 @@ final class AppModel: ObservableObject {
     func applyPending() {
         guard let plan = pendingPlan else { return }
         applying = true
+        let permanent = UserDefaults.standard.bool(forKey: Pref.permanentDelete)
         Task {
             let outcome = await Task.detached(priority: .userInitiated) {
-                Result { try Planner.apply(plan, env: plan.environment(from: appEnvironment())) }
+                Result { try Planner.apply(plan, env: plan.environment(from: appEnvironment()), permanent: permanent) }
             }.value
             pendingPlan = nil
             applying = false
@@ -176,6 +177,23 @@ final class AppModel: ObservableObject {
     @Published var trash: TrashStatus?
     @Published var emptying = false
     @Published var emptyResult: TrashEmptier.Result?
+    /// Muestra el diálogo «¿Vaciar la Papelera?». Lo piden la tarjeta de Inicio, el menú (⇧⌘⌫) y el resultado de un plan.
+    @Published var confirmEmpty = false
+
+    /// Pide confirmación para vaciar la Papelera, con su tamaño recién leído para que el diálogo diga qué se borra.
+    func askEmptyTrash() {
+        guard !emptying else { return }
+        refreshTrash()
+        confirmEmpty = true
+    }
+
+    /// Relee el tamaño de la Papelera (al abrir y antes de vaciarla), sin esperar al análisis inteligente.
+    func refreshTrash() {
+        Task {
+            let env = appEnvironment()
+            trash = await Task.detached(priority: .userInitiated) { TrashStatus.read(env) }.value
+        }
+    }
     func emptyTrash() {
         emptying = true
         Task {
@@ -204,6 +222,7 @@ final class AppModel: ObservableObject {
     func loadStorage(measureIfOld: Bool) {
         let env = appEnvironment()
         capacity = VolumeCapacity.read(env.home)
+        refreshTrash()
         if let cached = StorageAnalyzer.cached(env) {
             storage = cached
             refreshCapacity()
