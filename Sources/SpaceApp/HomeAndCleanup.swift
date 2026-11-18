@@ -95,9 +95,16 @@ extension ContentView {
     var trashCard: some View {
         card(t("Papelera"), "trash", primary: model.trash?.bytes.map { size($0) } ?? t("Tamaño desconocido"),
              detail: model.trash?.items.map { t("%@ · se libera al vaciarla", tn($0, "elemento", "elementos")) } ?? t("macOS no deja leerla sin «Acceso total al disco»")) {
-            Button(model.emptying ? t("Vaciando…") : t("Vaciar Papelera…"), systemImage: "trash", role: .destructive) { confirmEmpty = true }
-                .symbolEffect(.bounce, value: model.emptyResult?.date)
-                .disabled(model.emptying || model.trash?.items == 0)
+            HStack {
+                Button(model.emptying ? t("Vaciando…") : t("Vaciar Papelera…"), systemImage: "trash", role: .destructive) { confirmEmpty = true }
+                    .symbolEffect(.bounce, value: model.emptyResult?.date)
+                    .disabled(model.emptying || model.trash?.items == 0)
+                if model.trash?.bytes == nil {
+                    Button(t("Ver tamaño…")) { openFullDiskAccessSettings() }
+                        .buttonStyle(.borderless).font(.callout)
+                        .help(t("Para leer la Papelera, macOS pide dar a Margin «Acceso total al disco» en Ajustes del Sistema."))
+                }
+            }
         }
     }
 

@@ -11,6 +11,8 @@ struct MarginApp: App {
     init() {
         Preferences.register()
         CoreText.isEnglish = Localizer.isEnglish
+        // Lanzada por el agente de aviso de poco espacio: comprueba, avisa si hace falta y termina sin abrir ventana.
+        if CommandLine.arguments.contains(SpaceAlertAgent.argument) { SpaceAlertAgent.runCheckAndExit() }
     }
 
     var body: some Scene {

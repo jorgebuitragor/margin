@@ -15,6 +15,10 @@ struct SettingsPane: View {
     @AppStorage(Pref.colorblind) var colorblind = false
     @AppStorage(Pref.highContrast) var highContrast = false
     @AppStorage(Pref.reduceMotion) var reduceMotion = false
+    @AppStorage(Pref.alertEnabled) var alertEnabled = false
+    @AppStorage(Pref.alertThreshold) var alertThreshold = 15
+    @State var alertError: String?
+    @State var hasFullDiskAccess = TrashStatus.read(appEnvironment()).bytes != nil
     let palette: Palette
 
     var roots: [String] {
@@ -93,6 +97,28 @@ struct SettingsPane: View {
             } footer: {
                 Text(t("La paleta para daltonismo (Okabe e Ito) se distingue con cualquier tipo de daltonismo. Todos los colores llevan además su nombre y su tamaño en texto, y la app respeta «Reducir movimiento» de macOS."))
             }
+            Section {
+                Toggle(t("Avisarme cuando quede poco espacio"), isOn: Binding(get: { alertEnabled && SpaceAlertAgent.isInstalled }, set: { setAlert($0) }))
+                    .disabled(DevEnvironment.testSetting("HOME") != nil)
+                Stepper(value: $alertThreshold, in: 5...200, step: 5) {
+                    LabeledContent(t("Umbral"), value: t("menos de %@ libres", "\(alertThreshold) GB"))
+                }
+                .disabled(!alertEnabled)
+                Button(t("Enviar un aviso de prueba"), systemImage: "bell.badge") {
+                    SpaceAlertAgent.requestAuthorization { granted in
+                        guard granted, let capacity = VolumeCapacity.read() else {
+                            Task { @MainActor in alertError = t("macOS no permite notificaciones de Margin. Actívalas en Ajustes del Sistema › Notificaciones.") }
+                            return
+                        }
+                        SpaceAlertAgent.post(available: capacity.available, total: capacity.total, test: true)
+                    }
+                }
+                if let alertError { Text(alertError).font(.caption).foregroundStyle(palette.warning) }
+            } header: {
+                Text(t("Aviso de poco espacio"))
+            } footer: {
+                Text(t("Margin lo comprueba cada hora en segundo plano (solo lee el espacio libre) y avisa como mucho una vez al día, salvo que siga bajando. Al desactivarlo se retira el agente de inicio."))
+            }
             Section(t("Datos")) {
                 LabeledContent(t("Carpeta de datos"), value: appEnvironment().supportDirectory.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
                 HStack {
@@ -104,16 +130,46 @@ struct SettingsPane: View {
                     Button(t("Volver a medir el disco")) { model.measureStorage() }.disabled(model.storageProgress != nil)
                 }
                 Text(t("Guarda los planes, el registro de acciones y la última medición del disco. No guarda el contenido de tus archivos.")).font(.caption).foregroundStyle(.secondary)
+                LabeledContent(t("Acceso total al disco")) {
+                    HStack {
+                        Label(hasFullDiskAccess ? t("Concedido") : t("No concedido"), systemImage: hasFullDiskAccess ? "checkmark.circle.fill" : "exclamationmark.circle")
+                            .foregroundStyle(hasFullDiskAccess ? palette.accent : .secondary)
+                        if !hasFullDiskAccess { Button(t("Abrir Ajustes del Sistema…")) { openFullDiskAccessSettings() } }
+                    }
+                }
+                Text(t("Opcional. Sin él Margin no puede leer el tamaño de la Papelera ni las copias del iPhone; con él también mide carpetas protegidas de otras apps. Vaciar la Papelera no lo necesita.")).font(.caption).foregroundStyle(.secondary)
             }
             Section(t("Acerca de")) {
-                LabeledContent("Margin", value: t("Versión %@", "0.7"))
+                LabeledContent("Margin", value: t("Versión %@", "0.8"))
                 Text(t("Mide tu disco y te ayuda a liberar espacio sin sorpresas: nada se borra sin tu confirmación.")).font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            hasFullDiskAccess = TrashStatus.read(appEnvironment()).bytes != nil
+        }
         .scrollContentBackground(.hidden)
         .scrollEdgeEffectStyle(.soft, for: .top)
         .padding(.horizontal, 12)
+    }
+
+    func setAlert(_ on: Bool) {
+        alertError = nil
+        if on {
+            SpaceAlertAgent.requestAuthorization { granted in
+                Task { @MainActor in
+                    guard granted else {
+                        alertError = t("macOS no permite notificaciones de Margin. Actívalas en Ajustes del Sistema › Notificaciones.")
+                        alertEnabled = false
+                        return
+                    }
+                    do { try SpaceAlertAgent.install(); alertEnabled = true } catch { alertError = error.localizedDescription; alertEnabled = false }
+                }
+            }
+        } else {
+            SpaceAlertAgent.uninstall()
+            alertEnabled = false
+        }
     }
 
     func setRoots(_ list: [String]) {
@@ -132,6 +188,11 @@ struct SettingsPane: View {
         for url in panel.urls where !list.contains(url.path) { list.append(url.path) }
         setRoots(list)
     }
+}
+
+/// Abre Ajustes del Sistema en Privacidad › Acceso total al disco.
+func openFullDiskAccessSettings() {
+    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") { NSWorkspace.shared.open(url) }
 }
 
 /// Muestra de la paleta activa para comprobar que los colores se distinguen.

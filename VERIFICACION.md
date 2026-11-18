@@ -279,3 +279,21 @@ Hechas con clics sobre una carpeta personal sintética, sin ejecutar ningún pla
 - **Arreglado**: con una carpeta sintética, la barra de Inicio salía casi entera gris («Otros», 91 %), porque solo se mide esa carpeta. Jorge preguntó por qué. Ahora la barra lateral muestra «Modo de prueba» con la explicación. Con los datos reales, la barra tiene todos sus colores (verificado).
 - **Sin cubrir**: el efecto al pasar el ratón (en segundo plano no se puede mover el puntero) y ⌘2–⌘5 pulsados de verdad (⌘1 sí; el resto se probó desde el menú, que ejecuta la misma orden).
 - **Arreglado (aviso de Jorge con captura)**: en Carpetas sin analizar, los atajos se cortaban («Carpe…», «Desc…»), porque `ContentUnavailableView` encoge los botones al ancho del texto. Al sacarlos de ella con altura fija también desaparecían la barra lateral y las métricas. Ahora el estado vacío es una vista propia, compartida por Carpetas y Archivos (que no tenía atajos). Verificado con clics: se ven la barra lateral, las métricas y «Carpeta personal», «Descargas», «Escritorio» y «Developer» completos.
+
+## Pendientes cerrados (18-11-2026)
+
+- **Velocidad del análisis inteligente** (`MARGIN_TIMING=1`): de 13,8 s a 8,0 s.
+  - Los artefactos de proyectos bajaron de 12,8 a 7 s: el `concurrentPerform` anidado se ejecutaba en serie y ahora se usa una cola propia.
+  - Claude Desktop bajó de 9,3 a 7,3 s: cada carpeta se medía dos veces, una para el umbral y otra para el elemento; ahora se mide una sola vez.
+  - Los 25 s observados antes coincidieron con una medición del disco en marcha.
+- **Inglés en el análisis**: unos 270 textos del núcleo pasan por `loc(es, en)`.
+  - Una prueba nueva comprueba que las explicaciones cambian de idioma, pero los identificadores (también los de la CLI) y las acciones no.
+  - Otra comprueba que un plan creado en inglés se revalida sin bloqueos en español. Para ello, la revalidación compara las acciones por lo que ejecutan (tipo, argumentos, rutas, procesos) y no por sus textos, y Docker y los simuladores no disponibles tienen una clave fija.
+- **Aviso de poco espacio**:
+  - Tres pruebas de la regla: avisa por debajo del umbral, como mucho una vez al día, y antes si el espacio libre baja 2 GB más.
+  - El modo sin ventana (`--aviso-espacio`) termina al momento si el aviso está desactivado. Con un umbral de 500 GB registra el aviso, y una segunda comprobación no lo repite. No quedó ningún proceso ni agente, y los ajustes se devolvieron a su estado.
+  - No se activó el agente ni se envió una notificación real: eso pide el permiso de notificaciones a Jorge.
+- **Atajos**: ⌘2–⌘5 probados con pulsaciones reales; cada uno abre su sección. ⌘, (Ajustes) se probó desde el menú.
+- **Ajustes**: se ven bien la sección «Aviso de poco espacio» y la fila «Acceso total al disco», en inglés, que es el idioma que tenía guardado la app. Corregido: «Acerca de» decía «Versión 0.7».
+- **Total**: **68 pruebas, 0 fallos**.
+- **Nota**: como la app se firma ad hoc, al reinstalarla macOS puede olvidar el «Acceso total al disco» concedido; habría que volver a darlo.

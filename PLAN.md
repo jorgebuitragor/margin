@@ -130,10 +130,17 @@ Pendiente:
 - Liquid Glass (`glassEffect`, `GlassEffectContainer`, botones `.glass`/`.glassProminent`) en tarjetas, paneles y barras flotantes, sobre un fondo de malla de color por sección. Mínimo: macOS 26.
 - Animaciones y efectos de símbolos, con «Reducir movimiento» y «Reducir transparencia» respetados.
 
+Hecho después de la 0.8 (18-11-2026, «primero lo pendiente»):
+
+- **Análisis inteligente más rápido**: de unos 14 s a unos 8 s (los artefactos de proyectos se miden en paralelo con una cola propia y cada carpeta se mide una sola vez). `MARGIN_TIMING=1` muestra el tiempo de cada perfil.
+- **Explicaciones del análisis en inglés** (motivos, consecuencias, notas y mensajes de los planes) cuando la app está en inglés. La CLI y el MCP siguen en español. Los planes valen en los dos idiomas.
+- **Aviso de poco espacio** opcional (Ajustes): un agente de inicio comprueba cada hora el espacio libre y avisa como mucho una vez al día, salvo que siga bajando.
+- **Acceso total al disco**: estado en Ajustes y atajo a Ajustes del Sistema (también desde la tarjeta de la Papelera).
+
+Siguiente propuesto: **0.9 · desinstalación completa de apps** (app y sus restos por identificador, a la Papelera con plan; Homebrew con `brew uninstall --cask`; restos de apps ya borradas como «revisar»).
+
 Pendiente después de la 0.7:
 
-- Traducir al inglés los textos del análisis (perfiles, clasificación, mensajes de los planes).
-- Aviso opcional de poco espacio (LaunchAgent ligero), solo si Jorge lo quiere.
 
 ## Decisiones que necesita Jorge
 
