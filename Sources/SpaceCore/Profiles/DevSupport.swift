@@ -144,14 +144,25 @@ public struct DevEnvironment: Sendable {
 
     /// Busca un ejecutable en las rutas conocidas. Las de nvm se revisan de la versión más nueva a la más antigua.
     public func tool(_ name: String, extra: [String] = []) -> String? {
+        tools(name, extra: extra).first
+    }
+
+    /// Todas las copias instaladas de una herramienta (por ejemplo, un pnpm por cada versión de Node en nvm),
+    /// sin duplicados por enlace.
+    public func tools(_ name: String, extra: [String] = []) -> [String] {
         var dirs = extra + toolDirectories
         let nvm = path(".nvm/versions/node")
         dirs += children(nvm).sorted { Self.versionLess($1, $0) }.map { "\(nvm)/\($0)/bin" }
-        return dirs.map { "\($0)/\(name)" }.first { FileManager.default.isExecutableFile(atPath: $0) }
+        var seen = Set<String>()
+        return dirs.map { "\($0)/\(name)" }
+            .filter { FileManager.default.isExecutableFile(atPath: $0) && seen.insert(Self.canonical($0)).inserted }
     }
 
     /// Ruta del ejecutable para una acción: las herramientas de Android viven en el SDK y xcrun en /usr/bin.
     public func executable(for name: String) -> String? {
+        // Ruta absoluta: la fija el perfil (por ejemplo, el pnpm concreto que usa un store) y la revalidación
+        // comprueba que el perfil recalculado propone exactamente la misma.
+        if name.hasPrefix("/") { return FileManager.default.isExecutableFile(atPath: name) ? name : nil }
         switch name {
         case "sdkmanager", "avdmanager":
             let path = self.path("Library/Android/sdk/cmdline-tools/latest/bin/\(name)")

@@ -262,17 +262,7 @@ public enum DevProfiles {
 
     static func jsPackages(_ env: DevEnvironment) -> ProfileResult {
         var result = ProfileResult(id: "js-packages", name: "Cachés de paquetes JavaScript", owner: "pnpm / npm / yarn", detected: false)
-        var store = env.path("Library/pnpm/store")
-        if let pnpm = env.tool("pnpm"), let out = env.runner.run(pnpm, ["store", "path"], timeout: 15), out.status == 0 {
-            let path = out.output.trimmingCharacters(in: .whitespacesAndNewlines)
-            if env.isDirectory(path) { store = path }
-        }
-        if env.isDirectory(store) {
-            result.detected = true
-            result.items.append(.measured("js-packages", "Store de pnpm", path: store, category: .lowRisk,
-                reason: "Paquetes descargados por pnpm. Lo recuperable estimado son los archivos que ningún node_modules enlaza.",
-                regenerate: "pnpm vuelve a descargar los paquetes que pida un proyecto.", action: .run(["pnpm", "store", "prune"])))
-        }
+        pnpmStores(env, into: &result)
         let npm = env.path(".npm/_cacache")
         if env.isDirectory(npm), DiskUsage.measure(npm).allocated > 10_000_000 {
             result.detected = true
@@ -286,6 +276,47 @@ public enum DevProfiles {
             }
         }
         return result
+    }
+
+    /// Un elemento por store de pnpm. Cada versión de pnpm usa su propio store (`store/v10`, `store/v11`…) y
+    /// `pnpm store prune` solo limpia el suyo; un store que ninguna versión instalada usa se propone retirar entero.
+    static func pnpmStores(_ env: DevEnvironment, into result: inout ProfileResult) {
+        let root = env.path("Library/pnpm/store")
+        var owners: [String: [String]] = [:]   // store → binarios de pnpm que lo usan
+        let binaries = env.tools("pnpm")
+        var answered = 0
+        for binary in binaries {
+            guard let out = env.runner.run(binary, ["store", "path"], timeout: 15), out.status == 0 else { continue }
+            let path = out.output.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard env.isDirectory(path) else { continue }
+            answered += 1
+            owners[DevEnvironment.canonical(path), default: []].append(binary)
+        }
+        func label(_ binary: String) -> String {
+            let parts = binary.split(separator: "/")
+            if let i = parts.firstIndex(of: "node"), i + 1 < parts.count, parts.contains(".nvm") { return "pnpm de Node \(parts[i + 1])" }
+            return "pnpm en \(URL(fileURLWithPath: binary).deletingLastPathComponent().path)"
+        }
+        for (store, users) in owners.sorted(by: { $0.key < $1.key }) {
+            result.detected = true
+            let name = URL(fileURLWithPath: store).lastPathComponent
+            result.items.append(.measured("js-packages", "Store de pnpm \(name)", path: store, category: .lowRisk,
+                reason: "Paquetes descargados por pnpm; lo usa \(users.map(label).joined(separator: " y ")). Lo recuperable estimado son los archivos que ningún node_modules enlaza.",
+                regenerate: "pnpm vuelve a descargar los paquetes que pida un proyecto.", action: .run([users[0], "store", "prune"])))
+        }
+        // Stores que ninguna versión instalada de pnpm declara como suyo.
+        let candidates = env.isDirectory(root) ? env.children(root).map { "\(root)/\($0)" }.filter { env.isDirectory($0) } : []
+        for store in candidates where owners[DevEnvironment.canonical(store)] == nil {
+            guard DiskUsage.measure(store).allocated > 1_000_000 else { continue }
+            result.detected = true
+            let name = URL(fileURLWithPath: store).lastPathComponent
+            let known = answered > 0
+            result.items.append(.measured("js-packages", "Store de pnpm \(name) sin uso", path: store, category: known ? .lowRisk : .review,
+                reason: known ? "Ninguna versión de pnpm instalada usa este store (\(binaries.map(label).joined(separator: ", ")) usan otro): es de una versión anterior. Lo recuperable excluye archivos que aún enlace algún node_modules."
+                              : "No se pudo preguntar a ninguna versión de pnpm qué store usa: revisa si este sigue en uso.",
+                regenerate: "Si vuelves a instalar esa versión de pnpm, descargará de nuevo los paquetes. Los node_modules ya instalados conservan sus archivos (son enlaces duros).",
+                action: .trash(store)))
+        }
     }
 
     static func gradleMaven(_ env: DevEnvironment, _ index: ProjectIndex) -> ProfileResult {

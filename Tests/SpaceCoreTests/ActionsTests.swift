@@ -186,8 +186,10 @@ final class ActionsTests: XCTestCase {
         let pnpm = try file("bin/pnpm", 0, "#!/bin/sh\n")
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: pnpm.path)
         try file("Library/pnpm/store/v10/files/aa/blob", 2_000_000)
-        let env = env()
-        let store = try item(env, "Store de pnpm")
+        // El pnpm falso declara como suyo el store v10: el perfil propone su `store prune` con ese binario exacto.
+        let env = env(FakeRunner(["pnpm store path": home.appendingPathComponent("Library/pnpm/store/v10").path]))
+        let store = try item(env, "Store de pnpm v10")
+        XCTAssertEqual(store.action?.argv, [pnpm.path, "store", "prune"])
         let report = try Planner.apply(try Planner.plan(devItems: [store], env: env), env: env, executor: executor)
         XCTAssertEqual(report.results.first?.status, .done)
         XCTAssertEqual(executor.commands, [["pnpm", "store", "prune"]])
@@ -219,10 +221,34 @@ final class ActionsTests: XCTestCase {
             func trash(_ path: String) throws -> String? { nil }
             func run(_ executable: String, _ arguments: [String]) -> CommandResult? { CommandResult(status: 1, output: "", error: "ERR_PNPM_X algo falló") }
         }
-        let env = env()
-        let report = try Planner.apply(try Planner.plan(devItems: [try item(env, "Store de pnpm")], env: env), env: env, executor: ErrorExecutor())
+        let env = env(FakeRunner(["pnpm store path": home.appendingPathComponent("Library/pnpm/store/v10").path]))
+        let report = try Planner.apply(try Planner.plan(devItems: [try item(env, "Store de pnpm v10")], env: env), env: env, executor: ErrorExecutor())
         XCTAssertEqual(report.results.first?.status, .failed)
         XCTAssertTrue(report.results.first?.output?.contains("ERR_PNPM_X") == true)
+    }
+
+    func testOneItemPerPnpmStoreAndOrphanStore() throws {
+        // Dos versiones de pnpm (como en nvm) que usan el mismo store v11, y un store v10 que ya no usa ninguna.
+        for version in ["v20.0.0", "v24.0.0"] {
+            let bin = try file(".nvm/versions/node/\(version)/bin/pnpm", 0, "#!/bin/sh\n")
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: bin.path)
+        }
+        try file("Library/pnpm/store/v11/files/aa/blob", 2_000_000)
+        try file("Library/pnpm/store/v10/files/bb/blob", 3_000_000)
+        let v11 = home.appendingPathComponent("Library/pnpm/store/v11").path
+        let env = env(FakeRunner(["pnpm store path": v11]))
+        let items = DevProfiles.report(env).profiles.first { $0.id == "js-packages" }?.items ?? []
+        let current = try XCTUnwrap(items.first { $0.title == "Store de pnpm v11" })
+        XCTAssertEqual(current.category, .lowRisk)
+        XCTAssertEqual(current.action?.argv?.dropFirst(), ["store", "prune"])
+        XCTAssertTrue(current.reason.contains("v24.0.0") && current.reason.contains("v20.0.0"))
+        let orphan = try XCTUnwrap(items.first { $0.title == "Store de pnpm v10 sin uso" })
+        XCTAssertEqual(orphan.category, .lowRisk)
+        XCTAssertEqual(orphan.action?.paths, [home.appendingPathComponent("Library/pnpm/store/v10").path])
+        XCTAssertEqual(items.filter { $0.title.hasPrefix("Store de pnpm") }.count, 2)
+        // Sin poder preguntar a pnpm, un store huérfano queda para revisar, no como bajo riesgo.
+        let unknown = DevProfiles.report(self.env()).profiles.first { $0.id == "js-packages" }?.items ?? []
+        XCTAssertTrue(unknown.filter { $0.title.hasPrefix("Store de pnpm") }.allSatisfy { $0.category == .review })
     }
 
     func testExpiredPlanIsRejected() throws {
