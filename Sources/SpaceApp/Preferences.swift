@@ -32,7 +32,7 @@ enum Preferences {
     }
 
     /// Entorno de análisis con los ajustes del usuario (días de inactividad y carpetas de proyectos).
-    /// MARGEN_HOME (o ESPACIO_HOME) permite probar de punta a punta sobre una carpeta personal sintética.
+    /// MARGIN_HOME (o ESPACIO_HOME) permite probar de punta a punta sobre una carpeta personal sintética.
     static func environment() -> DevEnvironment {
         let roots = customProjectRoots
         let days = max(1, defaults.integer(forKey: Pref.inactiveDays))

@@ -33,7 +33,7 @@ final class AppModel: ObservableObject {
     /// si la pestaña actual no es ninguna de ellas).
     @Published var showTabs: [String]?
     /// Pestaña visible. Vive en el modelo para conservarse cuando la interfaz se reconstruye al cambiar el idioma.
-    /// MARGEN_TAB abre una pestaña al arrancar (pruebas visuales sin clics).
+    /// MARGIN_TAB abre una pestaña al arrancar (pruebas visuales sin clics).
     @Published var tab = DevEnvironment.testSetting("TAB") ?? UserDefaults.standard.string(forKey: Pref.startTab) ?? "Inicio"
     private var cancellation: ScanCancellation?
     private var session = UUID()
@@ -83,7 +83,7 @@ final class AppModel: ObservableObject {
     func cancel() { cancellation?.cancel(); message = t("Cancelando…") }
 
     struct QuickFolder { let title: String; let url: URL; let shortcut: KeyEquivalent; var path: String { url.path } }
-    /// Carpetas habituales que existen en esta carpeta personal (respeta MARGEN_HOME en pruebas).
+    /// Carpetas habituales que existen en esta carpeta personal (respeta MARGIN_HOME en pruebas).
     static func quickFolders() -> [QuickFolder] {
         let home = appEnvironment().home
         let candidates: [QuickFolder] = [

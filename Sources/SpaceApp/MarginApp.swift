@@ -3,7 +3,7 @@ import AppKit
 import SpaceCore
 
 @main
-struct MargenApp: App {
+struct MarginApp: App {
     @StateObject private var model = AppModel()
     @AppStorage(Pref.language) private var language = "sistema"
     @AppStorage(Pref.theme) private var theme = "sistema"
@@ -11,7 +11,7 @@ struct MargenApp: App {
     init() { Preferences.register() }
 
     var body: some Scene {
-        WindowGroup("Margen") {
+        WindowGroup("Margin") {
             ContentView(model: model)
                 // Cambiar el idioma reconstruye toda la interfaz con los textos nuevos.
                 .id(language)
@@ -23,7 +23,7 @@ struct MargenApp: App {
                     Preferences.applyTheme(theme)
                     let defaults = UserDefaults.standard
                     model.loadStorage(measureIfOld: defaults.bool(forKey: Pref.measureOnLaunch))
-                    // MARGEN_SCAN analiza una carpeta al arrancar (pruebas de interfaz sin el selector del sistema).
+                    // MARGIN_SCAN analiza una carpeta al arrancar (pruebas de interfaz sin el selector del sistema).
                     if let path = DevEnvironment.testSetting("SCAN"), model.report == nil {
                         model.scan(URL(fileURLWithPath: path))
                     } else if defaults.bool(forKey: Pref.smartOnLaunch), model.dev == nil {

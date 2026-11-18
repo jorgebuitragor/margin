@@ -1,4 +1,4 @@
-# Plan de Margen (antes «Gestor de espacio») · 0.2 → 0.7
+# Plan de Margin (antes «Gestor de espacio») · 0.2 → 0.7
 
 Fecha: 2026-11-17. Parte de la versión 0.1 (ver [PROYECTO.md](PROYECTO.md) y [VERIFICACION.md](VERIFICACION.md)). Estado de partida: 9 pruebas XCTest pasan desde la nueva ubicación `~/Developer/gestor-espacio-mac`; repositorio git recién inicializado, sin commits.
 
@@ -119,10 +119,10 @@ Pendiente:
 
 ### 0.7 · Barra del disco, ajustes, idiomas y nuevo nombre (pedido por Jorge) — ✅ hecha el 2026-11-18, ver VERIFICACION.md
 
-- **Barra del disco** en Inicio: el total del volumen por categorías (apps, documentos, datos de apps, desarrollo, macOS, Papelera, purgable, otros) y el disponible. Se mide en segundo plano con caché (`StorageAnalyzer`, `margen disco`) y el MCP la incluye en `disk_status`. Las demás pestañas muestran «disponible de total».
+- **Barra del disco** en Inicio: el total del volumen por categorías (apps, documentos, datos de apps, desarrollo, macOS, Papelera, purgable, otros) y el disponible. Se mide en segundo plano con caché (`StorageAnalyzer`, `margin disco`) y el MCP la incluye en `disk_status`. Las demás pestañas muestran «disponible de total».
 - **Ajustes** (barra lateral y ⌘,): general, análisis (días de inactividad, carpetas de proyectos), tema, idioma, accesibilidad (paleta Okabe-Ito para daltonismo, más contraste, reducir movimiento) y datos.
 - **Idiomas**: español e inglés en caliente, con tamaños y fechas en el formato de cada idioma. Pendiente: las explicaciones que genera el análisis (motivo, consecuencia, notas) siguen en español.
-- **Nuevo nombre: Margen**. App `Margen.app` (`local.margen.mac`) con icono propio, comando `margen` (alias `espacio`), MCP `margen`, carpeta de datos `Margen` (migra la anterior) y variables `MARGEN_*` (las `ESPACIO_*` siguen valiendo). La carpeta del repositorio conserva su nombre.
+- **Nuevo nombre: Margin** (primero se eligió «Margen»; Jorge prefirió «Margin» el mismo día). App `Margin.app` (`local.margin.mac`) con icono propio, comando `margin` (alias `margen` y `espacio`), MCP `margin`, carpeta de datos `Margin` (migra `GestorEspacio` o `Margen`) y variables `MARGIN_*` (las `MARGEN_*` y `ESPACIO_*` siguen valiendo). La carpeta del repositorio conserva su nombre.
 
 Pendiente después de la 0.7:
 

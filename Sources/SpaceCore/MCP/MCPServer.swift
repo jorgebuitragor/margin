@@ -3,7 +3,7 @@ import Foundation
 /// Servidor MCP (JSON-RPC 2.0 por stdio, un mensaje por línea) para agentes como Claude Code o Codex.
 ///
 /// Regla central: **ninguna herramienta ejecuta nada**. Los agentes pueden medir, analizar y crear planes;
-/// aplicarlos exige que el usuario escriba el código del plan en su propia terminal (`margen apply`).
+/// aplicarlos exige que el usuario escriba el código del plan en su propia terminal (`margin apply`).
 public final class MCPServer {
     public static let protocolVersion = "2025-06-18"
     public static let toolNames = ["disk_status", "scan_folder", "dev_report", "propose_cleanup", "plan_result"]
@@ -33,8 +33,8 @@ public final class MCPServer {
             return reply(id, [
                 "protocolVersion": requested ?? Self.protocolVersion,
                 "capabilities": ["tools": ["listChanged": false]],
-                "serverInfo": ["name": "margen", "version": "0.7.0"],
-                "instructions": "Mide el disco y propone limpiezas seguras. Ninguna herramienta borra ni ejecuta nada: propose_cleanup crea un plan y el usuario lo aplica en su terminal con `margen apply <id>`. No intentes aplicarlo tú."
+                "serverInfo": ["name": "margin", "version": "0.7.0"],
+                "instructions": "Mide el disco y propone limpiezas seguras. Ninguna herramienta borra ni ejecuta nada: propose_cleanup crea un plan y el usuario lo aplica en su terminal con `margin apply <id>`. No intentes aplicarlo tú."
             ])
         case "ping":
             return reply(id, [:])
@@ -61,7 +61,7 @@ public final class MCPServer {
     func call(_ name: String, _ args: [String: Any]) throws -> String {
         switch name {
         case "disk_status":
-            // Con el desglose por categorías de la última medición (la app o `margen disco`), si existe.
+            // Con el desglose por categorías de la última medición (la app o `margin disco`), si existe.
             struct Status: Encodable { let diagnostics: Diagnostics; let breakdown: StorageBreakdown? }
             let cached = StorageAnalyzer.cached(env)
             let breakdown = cached.flatMap { old in VolumeCapacity.read(env.home).map { StorageAnalyzer.build(capacity: $0, measured: Dictionary(uniqueKeysWithValues: old.segments.filter { $0.kind != .system && $0.kind != .purgeable }.map { ($0.kind, $0.bytes) }), date: old.date) } }
@@ -110,7 +110,7 @@ public final class MCPServer {
                let report = try? PlanStore.decoder.decode(ApplyReport.self, from: data) {
                 return try json(report)
             }
-            return try json(["plan": plan.id, "estado": "pendiente", "aplicar": "El usuario debe ejecutar en su terminal: margen apply \(plan.id)"])
+            return try json(["plan": plan.id, "estado": "pendiente", "aplicar": "El usuario debe ejecutar en su terminal: margin apply \(plan.id)"])
         default:
             throw ToolError(errorDescription: "Herramienta desconocida: \(name)")
         }
@@ -127,7 +127,7 @@ public final class MCPServer {
         tool("dev_report", "Perfiles de desarrollo (Android, Xcode, simuladores, node_modules inactivos, pnpm, Gradle, Docker, Homebrew, nvm, Claude, VS Code): qué se puede retirar, cuánto se recupera, por qué y con qué comando oficial. Devuelve un `id` por elemento accionable. Solo lectura; tarda unos 30 s.", [
             "inactive_days": ["type": "integer", "description": "Días sin cambios para considerar inactivo un proyecto (por defecto 30)."]
         ]),
-        tool("propose_cleanup", "Crea un plan con elementos de dev_report (`ids`) y/o archivos revisables (`files`). NO ejecuta nada: devuelve el código del plan para que el usuario lo aplique en su terminal con `margen apply <plan>`.", [
+        tool("propose_cleanup", "Crea un plan con elementos de dev_report (`ids`) y/o archivos revisables (`files`). NO ejecuta nada: devuelve el código del plan para que el usuario lo aplique en su terminal con `margin apply <plan>`.", [
             "ids": ["type": "array", "items": ["type": "string"], "description": "Identificadores de dev_report."],
             "files": ["type": "array", "items": ["type": "string"], "description": "Rutas de archivos «Revisar antes de borrar»."]
         ]),
@@ -217,13 +217,13 @@ struct PlanSummary: Encodable {
     let steps: [Step]
     let expires: Date
     let apply: String
-    let important = "Este plan NO se ha ejecutado. Solo el usuario puede aplicarlo, escribiendo el código del plan en su terminal. No ejecutes `margen apply` tú mismo."
+    let important = "Este plan NO se ha ejecutado. Solo el usuario puede aplicarlo, escribiendo el código del plan en su terminal. No ejecutes `margin apply` tú mismo."
 
     init(_ p: Plan) {
         plan = p.id
         recoverable = p.recoverable
         steps = p.steps.map { Step(title: $0.title, category: $0.category.rawValue, action: $0.action.kind == .trash ? "Mover a la Papelera: \($0.action.paths.joined(separator: ", "))" : $0.action.command, recoverable: $0.recoverable) }
         expires = p.created.addingTimeInterval(Planner.maxAge)
-        apply = "margen apply \(p.id)"
+        apply = "margin apply \(p.id)"
     }
 }

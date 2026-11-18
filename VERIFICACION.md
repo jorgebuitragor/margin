@@ -225,19 +225,31 @@ Fallos encontrados y corregidos:
 
 Sin cubrir: los atajos de teclado como pulsaciones reales (el control en segundo plano solo usa el menú, que ejecuta las mismas órdenes), el menú contextual (no se puede abrir en segundo plano) y el selector de carpetas del sistema.
 
-## 0.7 · Barra del disco, ajustes, idiomas y Margen (18-11-2026)
+## 0.7 · Barra del disco, ajustes, idiomas y Margin (18-11-2026)
 
 - `swift test`: **62 pruebas, 0 fallos**. Las 5 nuevas (`StorageTests`) comprueban:
   - que cada carpeta va a su categoría y que con una carpeta personal sintética no se mide nada del sistema real;
   - que las partes más el disponible suman exactamente el total;
   - que lo medido de más (clones de APFS, enlaces duros) se recorta y nunca supera lo usado;
   - que los volúmenes de macOS se leen del contenedor de «Data» en el formato real de `diskutil apfs list -plist`, ignorando discos externos e imágenes de simuladores;
-  - que la caché se guarda y se lee, y que la carpeta de datos `GestorEspacio` se renombra a `Margen` conservando el registro.
-- **Medición real** (`margen disco --text`, 23 s): disco de 245,1 GB, con 21,2 GB disponibles. Apps 25,9 GB; documentos y archivos 2,4; datos de apps y cachés 30,5; desarrollo 60,2; macOS 58,5; purgable 0,9; otros 45,5. Antes de separar macOS, «sistema y otros» era 115 GB (47 %).
+  - que la caché se guarda y se lee, y que la carpeta de datos `GestorEspacio` se renombra a `Margin` conservando el registro.
+- **Medición real** (`margin disco --text`, 23 s): disco de 245,1 GB, con 21,2 GB disponibles. Apps 25,9 GB; documentos y archivos 2,4; datos de apps y cachés 30,5; desarrollo 60,2; macOS 58,5; purgable 0,9; otros 45,5. Antes de separar macOS, «sistema y otros» era 115 GB (47 %).
 - **Pruebas con clics en la app** (datos reales, solo lectura):
   - **Barra y leyenda**: la leyenda muestra los nombres completos (la primera versión los cortaba). «Volver a medir» enseña el progreso y termina en «Medido ahora».
   - **Ajustes**: el tema claro y el oscuro se aplican al momento. Con inglés cambia toda la interfaz, y los tamaños pasan a «21.17 GB» (antes se quedaban con coma por usar el formateador del sistema; corregido). La app se queda en Ajustes al cambiar de idioma (antes volvía a Inicio; corregido). La paleta para daltonismo y el contraste cambian la barra, y los ajustes se conservan al reiniciar. `~/projects` y `~/Projects` (la misma carpeta) se muestran una vez.
   - **Otras pestañas**: Memoria en inglés y modo oscuro; Carpetas muestra «21.17 GB of 245.11 GB».
 - Después de probar se devolvieron los ajustes de tema, idioma y accesibilidad a sus valores por defecto.
-- **Instalación**: `install.sh` retiró `Gestor Espacio.app`, instaló `Margen.app` y `margen`, y dejó `espacio` como alias. `install-agentes.sh` registró el MCP `margen` (`claude mcp list` → Connected; también en Codex) y retiró `gestor-espacio`. `disk_status` por MCP devuelve el desglose.
+- **Instalación**: `install.sh` retiró `Gestor Espacio.app`, instaló `Margin.app` y `margin`, y dejó `espacio` como alias. `install-agentes.sh` registró el MCP `margin` (`claude mcp list` → Connected; también en Codex) y retiró `gestor-espacio`. `disk_status` por MCP devuelve el desglose.
 - Sin cubrir: la barra de menús del sistema (Archivo, Edición, Ventana) sigue en el idioma de macOS; las explicaciones del análisis están solo en español.
+
+### Cambio de nombre a «Margin» (18-11-2026)
+
+Jorge prefirió «Margin» a «Margen».
+- **Código**: se renombraron la app (`Margin.app`, `local.margin.mac`), el comando `margin`, el MCP `margin`, la carpeta de datos y las variables `MARGIN_*`. Los nombres anteriores siguen valiendo: `margen` y `espacio` como alias, y `MARGEN_*` y `ESPACIO_*` como variables.
+- **Pruebas**: **63 pruebas, 0 fallos**. La nueva comprueba que una carpeta de datos `Margen` se conserva al renombrarse.
+- **Instalación real**:
+  - `install.sh` retiró `Margen.app` e instaló `Margin.app`, y dejó `margen` y `espacio` como enlaces a `margin`.
+  - La carpeta de datos pasó a `~/Library/Application Support/Margin` con registro, planes y desglose.
+  - `install-agentes.sh` dejó registrado solo el MCP `margin` (Claude Code: Connected; Codex: enabled).
+  - `espacio disco --text` y `margen --help` funcionan.
+  - La app instalada muestra «Margin» en la barra lateral y en la ventana.

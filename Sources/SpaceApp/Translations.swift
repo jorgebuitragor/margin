@@ -64,7 +64,7 @@ let english: [String: String] = [
     "Revisa cada archivo con contexto antes de decidir.": "Review each file in context before deciding.",
     "Memoria RAM": "Memory",
     "Mediciones reales, sin promesas de aceleración.": "Real measurements, no speed-up promises.",
-    "Cómo analiza, cómo se ve y en qué idioma te habla Margen.": "How Margen scans, how it looks and which language it speaks.",
+    "Cómo analiza, cómo se ve y en qué idioma te habla Margin.": "How Margin scans, how it looks and which language it speaks.",
     "Apps": "Apps",
     "Documentos y archivos": "Documents and files",
     "Datos de apps y cachés": "App data and caches",

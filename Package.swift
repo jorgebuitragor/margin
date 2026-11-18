@@ -1,14 +1,14 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
-// Margen (antes «Gestor Espacio»). La app se llama MargenApp como producto para no chocar con el binario `margen`
+// Margin (antes «Gestor Espacio»). La app se llama MarginApp como producto para no chocar con el binario `margin`
 // de la terminal en un sistema de archivos que no distingue mayúsculas.
 let package = Package(
-    name: "Margen",
+    name: "Margin",
     platforms: [.macOS(.v14)],
     products: [
-        .executable(name: "MargenApp", targets: ["SpaceApp"]),
-        .executable(name: "margen", targets: ["SpaceCLI"])
+        .executable(name: "MarginApp", targets: ["SpaceApp"]),
+        .executable(name: "margin", targets: ["SpaceCLI"])
     ],
     targets: [
         .target(name: "SpaceCore"),

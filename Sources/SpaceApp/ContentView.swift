@@ -14,7 +14,7 @@ struct ContentView: View {
         nonmutating set { model.tab = newValue }
     }
     @State var confirmEmpty = false
-    // MARGEN_VIEW abre la vista de mapa al arrancar (pruebas visuales sin clics).
+    // MARGIN_VIEW abre la vista de mapa al arrancar (pruebas visuales sin clics).
     @State var folderView = DevEnvironment.testSetting("VIEW") ?? "Lista"
     @State var mapRoot: String?
     @State var devSelection: String?
@@ -36,7 +36,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 22) {
                 HStack(spacing: 10) {
                     BrandMark(color: accent).frame(width: 34, height: 34)
-                    Text("Margen").font(.largeTitle.bold()).foregroundStyle(accent)
+                    Text("Margin").font(.largeTitle.bold()).foregroundStyle(accent)
                 }.padding(.top, 24).accessibilityElement(children: .combine)
                 Text(t("CONOCE TU MAC")).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                 ForEach(Self.tabs, id: \.id) { item in sidebarButton(item.id, item.icon) }
@@ -105,7 +105,7 @@ struct ContentView: View {
         "Limpieza": "Cada elemento con su causa, su coste y el comando oficial de su herramienta.",
         "Archivos": "Revisa cada archivo con contexto antes de decidir.",
         "Memoria RAM": "Mediciones reales, sin promesas de aceleración.",
-        "Ajustes": "Cómo analiza, cómo se ve y en qué idioma te habla Margen."
+        "Ajustes": "Cómo analiza, cómo se ve y en qué idioma te habla Margin."
     ]
 
     var header: some View {
@@ -223,7 +223,7 @@ struct ContentView: View {
     }
 }
 
-/// Marca de Margen: una barra de disco con un margen libre a la derecha.
+/// Marca de Margin: una barra de disco con un margen libre a la derecha.
 struct BrandMark: View {
     var color: Color
     var body: some View {

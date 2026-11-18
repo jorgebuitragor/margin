@@ -189,23 +189,25 @@ public struct DevEnvironment: Sendable {
         return String(cString: real)
     }
 
-    /// Carpeta de datos (planes, registro, caché). Hasta la 0.6 la app se llamaba «Gestor Espacio»: si solo existe la
-    /// carpeta antigua, se renombra para conservar planes y registro.
+    /// Carpeta de datos (planes, registro, caché). La app se llamó «Gestor Espacio» hasta la 0.6 y «Margen» durante
+    /// la 0.7: si solo existe una carpeta antigua, se renombra para conservar planes y registro.
     public var supportDirectory: String {
-        let current = path("Library/Application Support/Margen")
-        let legacy = path("Library/Application Support/GestorEspacio")
+        let current = path("Library/Application Support/Margin")
         let fm = FileManager.default
-        if !fm.fileExists(atPath: current) && fm.fileExists(atPath: legacy) { try? fm.moveItem(atPath: legacy, toPath: current) }
+        if !fm.fileExists(atPath: current),
+           let legacy = ["Margen", "GestorEspacio"].map({ path("Library/Application Support/\($0)") }).first(where: { fm.fileExists(atPath: $0) }) {
+            try? fm.moveItem(atPath: legacy, toPath: current)
+        }
         return current
     }
 
-    /// Variable de prueba `MARGEN_<nombre>` (o la antigua `ESPACIO_<nombre>`).
+    /// Variable de prueba `MARGIN_<nombre>` (o las antiguas `MARGEN_<nombre>` y `ESPACIO_<nombre>`).
     public static func testSetting(_ name: String) -> String? {
         let env = ProcessInfo.processInfo.environment
-        return env["MARGEN_\(name)"] ?? env["ESPACIO_\(name)"]
+        return env["MARGIN_\(name)"] ?? env["MARGEN_\(name)"] ?? env["ESPACIO_\(name)"]
     }
 
-    /// Entorno real, o una carpeta personal sintética con MARGEN_HOME para probar de punta a punta.
+    /// Entorno real, o una carpeta personal sintética con MARGIN_HOME para probar de punta a punta.
     public static func fromProcess(projectRoots: [URL]? = nil, inactiveDays: Int = 30) -> DevEnvironment {
         if let home = testSetting("HOME") { return DevEnvironment(home: URL(fileURLWithPath: home), projectRoots: projectRoots, inactiveDays: inactiveDays) }
         return DevEnvironment(projectRoots: projectRoots, inactiveDays: inactiveDays)

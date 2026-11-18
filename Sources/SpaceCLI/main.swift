@@ -73,7 +73,7 @@ func printDev(_ report: DevReport) {
 }
 
 func baseEnvironment() -> DevEnvironment {
-    // MARGEN_HOME permite probar de punta a punta sobre una carpeta personal sintética.
+    // MARGIN_HOME permite probar de punta a punta sobre una carpeta personal sintética.
     if let home = DevEnvironment.testSetting("HOME") { return DevEnvironment(home: URL(fileURLWithPath: home)) }
     return DevEnvironment()
 }
@@ -158,7 +158,7 @@ do {
         if let max = intValue(&args, "--max-files") { options.maxEntries = max }
         let text = args.contains("--text")
         args.removeAll { $0 == "--text" }
-        guard args.count == 1 else { fail("Uso: margen scan /ruta [--depth N] [--min-mb N] [--max-files N] [--text]") }
+        guard args.count == 1 else { fail("Uso: margin scan /ruta [--depth N] [--min-mb N] [--max-files N] [--text]") }
         let report = try Scanner.scan(root: URL(fileURLWithPath: args[0]), options: options)
         if text { printText(report, folders: 25, files: 15) } else { try output(report) }
     case "dev":
@@ -167,7 +167,7 @@ do {
         roots(&args, &env)
         let text = args.contains("--text")
         args.removeAll { $0 == "--text" }
-        guard args.isEmpty else { fail("Uso: margen dev [--text] [--inactive-days N] [--roots ruta1,ruta2]") }
+        guard args.isEmpty else { fail("Uso: margin dev [--text] [--inactive-days N] [--roots ruta1,ruta2]") }
         let report = DevProfiles.report(env)
         if text { printDev(report) } else { try output(report) }
     case "plan":
@@ -180,7 +180,7 @@ do {
             files.append(DevEnvironment.canonical(NSString(string: args[index + 1]).expandingTildeInPath))
             args.removeSubrange(index...index + 1)
         }
-        guard !args.isEmpty || !files.isEmpty else { fail("Uso: margen plan <id> [<id>…] [--file /ruta]… — los id salen en `margen dev --text`.") }
+        guard !args.isEmpty || !files.isEmpty else { fail("Uso: margin plan <id> [<id>…] [--file /ruta]… — los id salen en `margin dev --text`.") }
         var items: [DevItem] = []
         if !args.isEmpty {
             print("Analizando perfiles para resolver los id…")
@@ -201,11 +201,11 @@ do {
         let plan = try Planner.plan(devItems: items, files: entries, env: env)
         try PlanStore.save(plan, env)
         printPlan(plan)
-        print("\nNo se ha ejecutado nada. Para aplicarlo (pedirá confirmación): margen apply \(plan.id)")
+        print("\nNo se ha ejecutado nada. Para aplicarlo (pedirá confirmación): margin apply \(plan.id)")
     case "vaciar-papelera":
         // Única acción de borrado definitivo: terminal interactiva y escribir VACIAR.
         if isatty(STDIN_FILENO) == 0 && DevEnvironment.testSetting("HOME") == nil {
-            fail("margen vaciar-papelera necesita una terminal interactiva.")
+            fail("margin vaciar-papelera necesita una terminal interactiva.")
         }
         let env = baseEnvironment()
         let trash = TrashStatus.read(env)
@@ -232,11 +232,11 @@ do {
         }
     case "apply":
         args.removeFirst()
-        guard args.count == 1 else { fail("Uso: margen apply <plan>") }
+        guard args.count == 1 else { fail("Uso: margin apply <plan>") }
         // La confirmación es del usuario: se exige una terminal interactiva para que un proceso (o un agente)
-        // no pueda aplicar un plan enviando el código por una tubería. MARGEN_HOME (modo de prueba) lo permite.
+        // no pueda aplicar un plan enviando el código por una tubería. MARGIN_HOME (modo de prueba) lo permite.
         if isatty(STDIN_FILENO) == 0 && DevEnvironment.testSetting("HOME") == nil {
-            fail("margen apply necesita una terminal interactiva: ejecútalo tú y escribe el código del plan.")
+            fail("margin apply necesita una terminal interactiva: ejecútalo tú y escribe el código del plan.")
         }
         let base = baseEnvironment()
         let plan = try PlanStore.load(args[0], base)
@@ -264,25 +264,25 @@ do {
         print("Registro: \(env.supportDirectory)/acciones.jsonl")
     case "help", "--help", nil:
         print("""
-        margen status         Diagnóstico de RAM y volumen en JSON.
-        margen disco          Desglose del disco por categorías (apps, documentos, desarrollo…). --text: legible.
-        margen scan /ruta     Totales por carpeta y archivos más grandes en JSON; solo lectura.
+        margin status         Diagnóstico de RAM y volumen en JSON.
+        margin disco          Desglose del disco por categorías (apps, documentos, desarrollo…). --text: legible.
+        margin scan /ruta     Totales por carpeta y archivos más grandes en JSON; solo lectura.
             --depth N         Profundidad de carpetas en el informe (por defecto 3).
             --min-mb N        Omite carpetas menores de N MB (por defecto 1).
             --max-files N     Archivos individuales a listar, los más grandes (por defecto 20000).
             --text            Resumen legible en lugar de JSON.
-        margen dev            Perfiles de desarrollo: cachés y artefactos regenerables con su comando oficial.
+        margin dev            Perfiles de desarrollo: cachés y artefactos regenerables con su comando oficial.
             --inactive-days N Días sin cambios para considerar inactivo un proyecto (por defecto 30).
             --roots a,b       Carpetas de proyectos (por defecto ~/Developer, ~/git, ~/projects…).
             --text            Resumen legible en lugar de JSON.
-        margen plan <id>… [--file /ruta]…
+        margin plan <id>… [--file /ruta]…
                               Crea un plan con elementos de `dev` (id) o archivos revisables. No ejecuta nada.
-        margen apply <plan>   Revalida, muestra vista previa y, si escribes el código del plan, ejecuta:
+        margin apply <plan>   Revalida, muestra vista previa y, si escribes el código del plan, ejecuta:
                               mueve a la Papelera o lanza el comando oficial de la herramienta.
-        margen vaciar-papelera
+        margin vaciar-papelera
                               Vacía la Papelera (a través de Finder) tras escribir VACIAR. Es la única acción
                               de borrado definitivo y no la puede lanzar ningún agente.
-        margen mcp            Servidor MCP por stdio para agentes (Claude Code, Codex): mide y crea planes,
+        margin mcp            Servidor MCP por stdio para agentes (Claude Code, Codex): mide y crea planes,
                               nunca los aplica.
         El borrado definitivo solo existe en vaciar-papelera. scan, dev, plan y mcp solo miden y proponen.
         Los totales siguen la lógica de du: espacio asignado, enlaces duros una vez, sin seguir enlaces.
@@ -290,7 +290,7 @@ do {
         Los informes incluyen rutas: comparte solo los datos que necesites.
         """)
     default:
-        fail("Comando inválido. Usa margen --help.")
+        fail("Comando inválido. Usa margin --help.")
     }
 } catch {
     fail(error.localizedDescription)

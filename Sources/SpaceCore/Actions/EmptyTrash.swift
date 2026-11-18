@@ -23,7 +23,7 @@ public enum TrashEmptier {
     }
 
     public static func empty(env: DevEnvironment, executor: ActionExecutor = SystemExecutor()) -> Result {
-        // Finder solo conoce la Papelera real: con una carpeta personal de prueba (MARGEN_HOME) nunca se vacía.
+        // Finder solo conoce la Papelera real: con una carpeta personal de prueba (MARGIN_HOME) nunca se vacía.
         if executor is SystemExecutor && DevEnvironment.canonical(env.home.path) != DevEnvironment.canonical(FileManager.default.homeDirectoryForCurrentUser.path) {
             return Result(date: Date(), status: .blocked, message: "Modo de prueba: la Papelera real no se vacía con una carpeta personal sintética.", availableBefore: nil, availableAfter: nil, output: nil)
         }

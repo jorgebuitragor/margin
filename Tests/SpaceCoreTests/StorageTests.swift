@@ -70,12 +70,21 @@ final class StorageTests: XCTestCase {
         XCTAssertNil(StorageAnalyzer.systemVolumesBytes(total: 1_000, runner: FakeRunner()), "Sin diskutil no se inventa nada")
     }
 
+    func testDataFolderFromTheBriefMargenNameIsKept() throws {
+        let legacy = home.appendingPathComponent("Library/Application Support/Margen/planes")
+        try FileManager.default.createDirectory(at: legacy, withIntermediateDirectories: true)
+        try Data("{}".utf8).write(to: legacy.appendingPathComponent("abcd1234.json"))
+        let env = DevEnvironment(home: home)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: env.supportDirectory + "/planes/abcd1234.json"))
+    }
+
     func testCacheRoundTripAndLegacyDataFolderIsKept() throws {
         let legacy = home.appendingPathComponent("Library/Application Support/GestorEspacio")
         try FileManager.default.createDirectory(at: legacy, withIntermediateDirectories: true)
         try Data("{}".utf8).write(to: legacy.appendingPathComponent("acciones.jsonl"))
         let env = DevEnvironment(home: home)
-        XCTAssertTrue(env.supportDirectory.hasSuffix("Application Support/Margen"))
+        XCTAssertTrue(env.supportDirectory.hasSuffix("Application Support/Margin"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path), "La carpeta antigua se renombra, no se copia")
         XCTAssertTrue(FileManager.default.fileExists(atPath: env.supportDirectory + "/acciones.jsonl"), "El registro de la 0.6 se conserva")
         let breakdown = StorageAnalyzer.build(capacity: VolumeCapacity(total: 10, available: 4, purgeable: 1), measured: [.apps: 2], date: Date(timeIntervalSince1970: 1_800_000_000))
         StorageAnalyzer.save(breakdown, env)

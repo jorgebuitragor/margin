@@ -106,7 +106,7 @@ struct SettingsPane: View {
                 Text(t("Guarda los planes, el registro de acciones y la última medición del disco. No guarda el contenido de tus archivos.")).font(.caption).foregroundStyle(.secondary)
             }
             Section(t("Acerca de")) {
-                LabeledContent("Margen", value: t("Versión %@", "0.7"))
+                LabeledContent("Margin", value: t("Versión %@", "0.7"))
                 Text(t("Mide tu disco y te ayuda a liberar espacio sin sorpresas: nada se borra sin tu confirmación.")).font(.caption).foregroundStyle(.secondary)
             }
         }
