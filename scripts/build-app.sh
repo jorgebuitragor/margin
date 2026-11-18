@@ -1,5 +1,6 @@
 #!/bin/bash
-# Compila Margin.app (firmada ad hoc) y el binario `margin` de la terminal.
+# Compila Margin.app y el binario `margin` de la terminal. La app se firma con la identidad «Margin Local»
+# (scripts/firma-local.sh) para que macOS conserve sus permisos entre versiones; si no existe, se firma ad hoc.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export CLANG_MODULE_CACHE_PATH="${TMPDIR:-/tmp}/margin-clang-cache"
@@ -33,7 +34,12 @@ cat > "$app_dir/Contents/Info.plist" <<'PLIST'
 </dict></plist>
 PLIST
 xattr -cr "$app_dir"
-codesign --force --sign - "$app_dir"
+if security find-certificate -c "Margin Local" "$HOME/Library/Keychains/login.keychain-db" >/dev/null 2>&1; then
+  codesign --force --sign "Margin Local" "$app_dir"
+else
+  echo "Aviso: no existe la identidad «Margin Local» (bash scripts/firma-local.sh); se firma ad hoc y macOS puede olvidar los permisos." >&2
+  codesign --force --sign - "$app_dir"
+fi
 codesign --verify --deep --strict "$app_dir"
 ditto -c -k --norsrc --keepParent "$app_dir" "$PWD/dist/Margin.zip"
 printf 'App local creada: %s\nZIP: %s\n' "$app_dir" "$PWD/dist/Margin.zip"

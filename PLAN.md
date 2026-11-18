@@ -121,7 +121,7 @@ Pendiente:
 
 - **Barra del disco** en Inicio: el total del volumen por categorías (apps, documentos, datos de apps, desarrollo, macOS, Papelera, purgable, otros) y el disponible. Se mide en segundo plano con caché (`StorageAnalyzer`, `margin disco`) y el MCP la incluye en `disk_status`. Las demás pestañas muestran «disponible de total».
 - **Ajustes** (barra lateral y ⌘,): general, análisis (días de inactividad, carpetas de proyectos), tema, idioma, accesibilidad (paleta Okabe-Ito para daltonismo, más contraste, reducir movimiento) y datos.
-- **Idiomas**: español e inglés en caliente, con tamaños y fechas en el formato de cada idioma. Pendiente: las explicaciones que genera el análisis (motivo, consecuencia, notas) siguen en español.
+- **Idiomas**: español e inglés en caliente, con tamaños y fechas en el formato de cada idioma. Las explicaciones del análisis se tradujeron después de la 0.8.
 - **Nuevo nombre: Margin** (primero se eligió «Margen»; Jorge prefirió «Margin» el mismo día). App `Margin.app` (`local.margin.mac`) con icono propio, comando `margin` (alias `margen` y `espacio`), MCP `margin`, carpeta de datos `Margin` (migra `GestorEspacio` o `Margen`) y variables `MARGIN_*` (las `MARGEN_*` y `ESPACIO_*` siguen valiendo). La carpeta del repositorio conserva su nombre.
 
 ### 0.8 · Navegación y Liquid Glass (pedido por Jorge) — ✅ hecha el 2026-11-18, ver VERIFICACION.md
@@ -143,8 +143,10 @@ Hecho después de la 0.8 (18-11-2026, «primero lo pendiente»):
 - Desinstalar va por plan, igual que el resto de la limpieza. La regla de rutas admite solo una app de primer nivel de /Applications: nunca en modo de prueba, nunca de Apple salvo las de la App Store, nunca Margin. Si macOS no deja moverla, la mueve Finder, que pide tu contraseña.
 - **Restos de apps ya borradas**: identificadores que ninguna app del Mac usa, comprobados con Spotlight, siempre como «revisar».
 
-Pendiente después de la 0.7:
+Pendiente después de la 0.9:
 
+- **Comprobaciones que solo puede hacer Jorge**: dar acceso total al disco, activar el aviso y mandar el de prueba (permiso de notificaciones), desinstalar de verdad una app de la App Store o de administrador (Finder pide la contraseña), y los atajos, el menú contextual del mapa y los efectos al pasar el ratón.
+- ~~Firma estable~~ ✅ hecha el 2026-11-18: la app se firma con la identidad local «Margin Local» (`scripts/firma-local.sh`) en vez de ad hoc, así que macOS conserva sus permisos entre versiones.
 
 ## Decisiones que necesita Jorge
 

@@ -322,3 +322,10 @@ Hechas con clics sobre una carpeta personal sintética, sin ejecutar ningún pla
 - **No se desinstaló nada real**. La vía de Finder para apps de root o de la App Store (contraseña) no se probó: pediría tu contraseña y movería una app real.
 - **MCP**: `apps_report` devuelve las apps con sus `id`, y `propose_cleanup` los acepta. La skill explica el flujo.
 - **Nota**: al lanzar el binario directamente sin ventanas guardadas, macOS no abre ninguna; abriendo la app de forma normal sí aparece. Es la restauración de ventanas de macOS, no un fallo.
+
+## Firma estable (18-11-2026)
+
+- `scripts/firma-local.sh` creó la identidad «Margin Local» en el llavero de inicio de sesión: certificado propio de 10 años para firma de código, sin marcarlo como de confianza ni tocar ajustes del sistema. La clave privada se generó en una carpeta temporal que se borra; solo `codesign` puede usarla sin preguntar. Volver a ejecutarlo no hace nada.
+- `codesign` firma con ella sin diálogos. La app instalada queda con `Authority=Margin Local` y el requisito designado `identifier "local.margin.mac" and certificate leaf = H"42cf6410…"`, que ya no depende del binario: es el mismo en cada compilación, y es lo que macOS usa para recordar permisos.
+- Margin abre normalmente con la nueva firma y no hay rechazos en el registro del sistema.
+- Pendiente de Jorge: los permisos dados antes, con la firma ad hoc, pueden no valer; hay que darlos una vez más.
