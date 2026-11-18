@@ -98,6 +98,19 @@ final class AppModel: ObservableObject {
     @Published var dev: DevReport?
     @Published var devBusy = false
 
+    // Apps instaladas y sus restos (sección Apps). Solo lectura hasta que confirmes un plan.
+    @Published var apps: AppsReport?
+    @Published var appsBusy = false
+    func analyzeApps() {
+        guard !appsBusy else { return }
+        appsBusy = true
+        Task {
+            let env = appEnvironment()
+            apps = await Task.detached(priority: .userInitiated) { AppInventory.report(env) }.value
+            appsBusy = false
+        }
+    }
+
     // Acciones: plan → confirmación → ejecución → resultado.
     @Published var pendingPlan: Plan?
     @Published var blockers: [String: String] = [:]
@@ -144,6 +157,7 @@ final class AppModel: ObservableObject {
             }
             refreshCapacity()
             if dev != nil { analyzeDev() }
+            if apps != nil { analyzeApps() }
         }
     }
     func analyzeDev() {

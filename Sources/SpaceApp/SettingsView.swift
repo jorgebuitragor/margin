@@ -140,7 +140,7 @@ struct SettingsPane: View {
                 Text(t("Opcional. Sin él Margin no puede leer el tamaño de la Papelera ni las copias del iPhone; con él también mide carpetas protegidas de otras apps. Vaciar la Papelera no lo necesita.")).font(.caption).foregroundStyle(.secondary)
             }
             Section(t("Acerca de")) {
-                LabeledContent("Margin", value: t("Versión %@", "0.8"))
+                LabeledContent("Margin", value: t("Versión %@", "0.9"))
                 Text(t("Mide tu disco y te ayuda a liberar espacio sin sorpresas: nada se borra sin tu confirmación.")).font(.caption).foregroundStyle(.secondary)
             }
         }

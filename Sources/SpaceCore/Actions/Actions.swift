@@ -127,8 +127,26 @@ public struct SystemExecutor: ActionExecutor {
     public init() {}
     public func trash(_ path: String) throws -> String? {
         var resulting: NSURL?
-        try FileManager.default.trashItem(at: URL(fileURLWithPath: path), resultingItemURL: &resulting)
-        return resulting?.path
+        do {
+            try FileManager.default.trashItem(at: URL(fileURLWithPath: path), resultingItemURL: &resulting)
+            return resulting?.path
+        } catch where path.hasSuffix(".app") {
+            // Apps de root o de la App Store: las mueve Finder, que pide la contraseña de administrador al usuario.
+            try Self.trashWithFinder(path)
+            return nil
+        }
+    }
+
+    struct FinderError: LocalizedError { let errorDescription: String? }
+
+    static func trashWithFinder(_ path: String) throws {
+        let escaped = path.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+        guard let result = ProcessRunner().run("/usr/bin/osascript", ["-e", "tell application \"Finder\" to delete (POSIX file \"\(escaped)\" as alias)"], timeout: 300) else {
+            throw FinderError(errorDescription: loc("Finder no respondió a tiempo.", "Finder didn't respond in time."))
+        }
+        guard result.status == 0 else {
+            throw FinderError(errorDescription: loc("Finder no pudo moverla a la Papelera (¿cancelaste la contraseña?): \(result.error.trimmingCharacters(in: .whitespacesAndNewlines))", "Finder couldn't move it to the Trash (did you cancel the password?): \(result.error.trimmingCharacters(in: .whitespacesAndNewlines))"))
+        }
     }
     public func run(_ executable: String, _ arguments: [String]) -> CommandResult? {
         ProcessRunner().run(executable, arguments, timeout: 30 * 60)
@@ -211,6 +229,10 @@ public enum Planner {
                                   action: .trash(entry.path), identities: [entry.path: identity], bytes: entry.allocatedBytes, recoverable: entry.allocatedBytes))
         }
         guard !steps.isEmpty else { throw PlanError.notFound(loc("ningún elemento para el plan", "no item for the plan")) }
+        // Al desinstalar, primero los restos y la app al final: si la app desapareciera antes, sus restos dejarían de
+        // constar como suyos al revalidar y el resto del plan se bloquearía.
+        let isAppBundle: (PlanStep) -> Bool = { $0.profile == AppInventory.profileID && ($0.action.paths.contains { $0.hasSuffix(".app") } || $0.action.argv?.first == "brew") }
+        steps = steps.filter { !isAppBundle($0) } + steps.filter(isAppBundle)
         let id = String(format: "%08x", UInt32.random(in: 0...UInt32.max))
         return Plan(id: id, created: env.now, home: env.home.path, steps: steps, inactiveDays: env.inactiveDays, projectRoots: env.projectRoots.map(\.path))
     }
@@ -269,6 +291,7 @@ public enum Planner {
 
     /// Reglas de seguridad independientes de los perfiles para cualquier ruta que se mueva a la Papelera.
     static func pathProblem(_ path: String, env: DevEnvironment) -> String? {
+        if path.hasPrefix("/Applications/") { return applicationProblem(path, env: env) }
         let home = env.home.path
         guard path.hasPrefix(home + "/") else { return loc("Fuera de tu carpeta personal: \(path)", "Outside your home folder: \(path)") }
         let below = path.dropFirst(home.count + 1).split(separator: "/")
@@ -277,6 +300,27 @@ public enum Planner {
         guard let real = realpath(path, nil) else { return loc("No existe: \(path)", "Doesn't exist: \(path)") }
         defer { free(real) }
         guard String(cString: real) == path else { return loc("La ruta pasa por un enlace simbólico: \(path)", "The path goes through a symbolic link: \(path)") }
+        return nil
+    }
+
+    /// Única excepción a «dentro de tu carpeta personal»: una app de primer nivel en /Applications. Nunca en modo de
+    /// prueba, nunca una carpeta (Utilidades), nunca Margin ni una app de Apple incluida con macOS.
+    static func applicationProblem(_ path: String, env: DevEnvironment) -> String? {
+        guard AppInventory.isRealHome(env) else {
+            return loc("Modo de prueba: no se tocan las apps de /Applications.", "Test mode: apps in /Applications aren't touched.")
+        }
+        let below = path.dropFirst("/Applications/".count)
+        guard !below.contains("/"), below.hasSuffix(".app"), below.count > 4 else {
+            return loc("Solo se puede retirar una app de primer nivel de /Applications: \(path)", "Only a top-level app in /Applications can be removed: \(path)")
+        }
+        guard let real = realpath(path, nil) else { return loc("No existe: \(path)", "Doesn't exist: \(path)") }
+        defer { free(real) }
+        guard String(cString: real) == path else { return loc("La ruta pasa por un enlace simbólico: \(path)", "The path goes through a symbolic link: \(path)") }
+        let id = AppInventory.info(path)?["CFBundleIdentifier"] as? String
+        if id == AppInventory.ownBundleID { return loc("Margin no se desinstala a sí misma.", "Margin doesn't uninstall itself.") }
+        if id?.hasPrefix("com.apple.") == true && !FileManager.default.fileExists(atPath: "\(path)/Contents/_MASReceipt") {
+            return loc("App de Apple incluida con macOS: no se toca.", "Apple app included with macOS: not touched.")
+        }
         return nil
     }
 

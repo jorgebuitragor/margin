@@ -6,11 +6,12 @@ import Foundation
 /// aplicarlos exige que el usuario escriba el código del plan en su propia terminal (`margin apply`).
 public final class MCPServer {
     public static let protocolVersion = "2025-06-18"
-    public static let toolNames = ["disk_status", "scan_folder", "dev_report", "propose_cleanup", "plan_result"]
+    public static let toolNames = ["disk_status", "scan_folder", "dev_report", "apps_report", "propose_cleanup", "plan_result"]
 
     var env: DevEnvironment
     /// Último análisis de perfiles: permite resolver los id que propone el agente sin volver a medir todo.
     private var lastDev: DevReport?
+    private var lastApps: AppsReport?
 
     public init(env: DevEnvironment = DevEnvironment()) { self.env = env }
 
@@ -80,15 +81,21 @@ public final class MCPServer {
             let report = DevProfiles.report(devEnv)
             lastDev = report
             return try json(DevSummary(report))
+        case "apps_report":
+            let report = AppInventory.report(env)
+            lastApps = report
+            return try json(AppsSummary(report, limit: int(args["limit"]) ?? 25))
         case "propose_cleanup":
             let ids = (args["ids"] as? [String]) ?? []
             let files = (args["files"] as? [String]) ?? []
             guard !ids.isEmpty || !files.isEmpty else { throw ToolError(errorDescription: "Indica `ids` (de dev_report) o `files`.") }
             var items: [DevItem] = []
             if !ids.isEmpty {
-                let all = (lastDev ?? DevProfiles.report(env)).profiles.flatMap(\.items)
+                var all = (lastDev ?? DevProfiles.report(env)).profiles.flatMap(\.items)
+                let apps = lastApps ?? AppInventory.report(env, measure: false)
+                all += apps.apps.flatMap(\.items) + apps.orphans
                 for id in ids {
-                    guard let item = all.first(where: { $0.shortID == id }) else { throw ToolError(errorDescription: "No existe el id \(id). Llama antes a dev_report.") }
+                    guard let item = all.first(where: { $0.shortID == id }) else { throw ToolError(errorDescription: "No existe el id \(id). Llama antes a dev_report o apps_report.") }
                     items.append(item)
                 }
             }
@@ -126,6 +133,9 @@ public final class MCPServer {
         ], required: ["path"]),
         tool("dev_report", "Perfiles de desarrollo (Android, Xcode, simuladores, node_modules inactivos, pnpm, Gradle, Docker, Homebrew, nvm, Claude, VS Code): qué se puede retirar, cuánto se recupera, por qué y con qué comando oficial. Devuelve un `id` por elemento accionable. Solo lectura; tarda unos 30 s.", [
             "inactive_days": ["type": "integer", "description": "Días sin cambios para considerar inactivo un proyecto (por defecto 30)."]
+        ]),
+        tool("apps_report", "Apps instaladas (de mayor a menor, con sus restos en ~/Library) y restos de apps ya borradas. Cada elemento trae `id` para propose_cleanup. Desinstalar es mover la app y los restos elegidos a la Papelera (o `brew uninstall --cask` si vino de Homebrew); las apps de Apple y Margin están protegidas. Solo lectura; tarda unos segundos.", [
+            "limit": ["type": "integer", "description": "Máximo de apps a devolver (por defecto 25)."]
         ]),
         tool("propose_cleanup", "Crea un plan con elementos de dev_report (`ids`) y/o archivos revisables (`files`). NO ejecuta nada: devuelve el código del plan para que el usuario lo aplique en su terminal con `margin apply <plan>`.", [
             "ids": ["type": "array", "items": ["type": "string"], "description": "Identificadores de dev_report."],
@@ -181,6 +191,30 @@ struct ScanSummary: Encodable {
         complete = !r.cancelled && r.issues.isEmpty
         folders = r.folders.filter { $0.depth > 0 }.prefix(60).map { Folder(path: $0.path, bytes: $0.allocatedBytes, protection: $0.protection, partial: $0.partial) }
         largestFiles = r.entries.prefix(maxFiles).map { File(path: $0.path, bytes: $0.bytes ?? $0.allocatedBytes, category: $0.classification.category.rawValue, reason: $0.classification.reason) }
+    }
+}
+
+struct AppsSummary: Encodable {
+    struct Item: Encodable {
+        let id: String; let title: String; let category: String; let bytes: Int64?; let reason: String; let regenerate: String; let action: String?
+        init(_ i: DevItem) {
+            id = i.shortID; title = i.title; category = i.category.rawValue; bytes = i.bytes; reason = i.reason; regenerate = i.regenerate; action = i.action?.command
+        }
+    }
+    struct App: Encodable {
+        let name: String; let bundleID: String?; let source: String; let totalBytes: Int64; let lastUsed: Date?; let protectedReason: String?
+        let items: [Item]; let systemLeftovers: [String]
+    }
+    let apps: [App]
+    let orphans: [Item]
+    let next = "Para desinstalar, llama a propose_cleanup con el id de la app y los de los restos que el usuario elija. Los «Revisar antes de borrar» (datos, preferencias, contenedores, restos de apps borradas) solo si los confirma uno por uno. El usuario lo aplica con `margin apply`."
+
+    init(_ r: AppsReport, limit: Int) {
+        apps = r.apps.sorted { $0.totalBytes > $1.totalBytes }.prefix(max(limit, 1)).map {
+            App(name: $0.name, bundleID: $0.bundleID, source: $0.source.rawValue, totalBytes: $0.totalBytes, lastUsed: $0.lastUsed,
+                protectedReason: $0.protectedReason, items: $0.items.map(Item.init), systemLeftovers: $0.systemLeftovers)
+        }
+        orphans = r.orphans.map(Item.init)
     }
 }
 

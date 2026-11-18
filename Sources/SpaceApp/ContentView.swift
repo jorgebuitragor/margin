@@ -19,6 +19,12 @@ struct ContentView: View {
     @State var mapRoot: String?
     @State var devSelection: String?
     @State var hoveredTile: String?
+    @State var appSelection: String?
+    @State var appChecked = Set<String>()
+    @State var appSearch = ""
+    @State var appsMode = "Apps"
+    @State var appsSort = "Tamaño"
+    @State var onlyUnused = false
     @AppStorage(Pref.colorblind) var colorblind = false
     @AppStorage(Pref.highContrast) var highContrast = false
     @AppStorage(Pref.reduceMotion) var reduceMotionSetting = false
@@ -29,7 +35,7 @@ struct ContentView: View {
     var reduceMotion: Bool { reduceMotionSetting || systemReduceMotion }
 
     static let tabs: [(id: String, icon: String)] = [
-        ("Inicio", "sparkles"), ("Limpieza", "hammer"), ("Carpetas", "folder"), ("Archivos", "doc"), ("Memoria RAM", "memorychip")
+        ("Inicio", "sparkles"), ("Limpieza", "hammer"), ("Apps", "square.grid.2x2"), ("Carpetas", "folder"), ("Archivos", "doc"), ("Memoria RAM", "memorychip")
     ]
     /// Contador por pestaña para animar solo el icono de la pestaña recién elegida.
     @State var bounces: [String: Int] = [:]
@@ -105,7 +111,7 @@ struct ContentView: View {
                 }
                 Label(t("Nada sin tu confirmación"), systemImage: "checkmark.shield.fill")
                     .font(.callout.weight(.medium)).foregroundStyle(accent)
-                Text(t("Versión %@", "0.8")).font(.caption2).foregroundStyle(.tertiary)
+                Text(t("Versión %@", "0.9")).font(.caption2).foregroundStyle(.tertiary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 18).padding(.vertical, 14)
@@ -132,6 +138,7 @@ struct ContentView: View {
                 case "Carpetas": folders
                 case "Archivos": files
                 case "Limpieza": development
+                case "Apps": appsView
                 case "Ajustes": settings
                 default: memory
                 }
@@ -162,6 +169,32 @@ struct ContentView: View {
                     .labelStyle(.titleAndIcon)
                     .buttonStyle(.glassProminent).tint(accent)
                     .disabled(model.devBusy)
+            }
+        }
+        if tab == "Apps" {
+            ToolbarItem {
+                Picker(t("Mostrar"), selection: $appsMode.animation(.smooth)) {
+                    Text(t("Apps")).tag("Apps")
+                    Text(t("Restos de apps borradas")).tag("Restos")
+                }.pickerStyle(.segmented)
+            }
+            ToolbarItem {
+                Menu(t("Ordenar"), systemImage: "arrow.up.arrow.down") {
+                    Picker(t("Ordenar"), selection: $appsSort.animation(.smooth)) {
+                        Text(t("Tamaño")).tag("Tamaño")
+                        Text(t("Último uso")).tag("Último uso")
+                        Text(t("Nombre")).tag("Nombre")
+                    }
+                    Toggle(t("Solo las que no usas desde hace 3 meses"), isOn: $onlyUnused.animation(.smooth))
+                }
+                .help(t("Ordenar"))
+                .accessibilityLabel(t("Ordenar"))
+            }
+            ToolbarItem {
+                Button(model.appsBusy ? t("Analizando…") : t("Volver a analizar"), systemImage: "arrow.clockwise") { model.analyzeApps() }
+                    .symbolEffect(.rotate, isActive: model.appsBusy)
+                    .labelStyle(.titleAndIcon)
+                    .disabled(model.appsBusy)
             }
         }
         if tab == "Carpetas" && model.report != nil {

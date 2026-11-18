@@ -297,3 +297,28 @@ Hechas con clics sobre una carpeta personal sintética, sin ejecutar ningún pla
 - **Ajustes**: se ven bien la sección «Aviso de poco espacio» y la fila «Acceso total al disco», en inglés, que es el idioma que tenía guardado la app. Corregido: «Acerca de» decía «Versión 0.7».
 - **Total**: **68 pruebas, 0 fallos**.
 - **Nota**: como la app se firma ad hoc, al reinstalarla macOS puede olvidar el «Acceso total al disco» concedido; habría que volver a darlo.
+
+## 0.9 · Desinstalación completa de apps (18-11-2026)
+
+- **76 pruebas, 0 fallos**. Las 8 nuevas (`AppsTests`) usan apps de mentira en una carpeta personal sintética y comprueban:
+  - la app y sus restos con el riesgo de cada tipo; los contenedores no se recorren, y el ayudante de una app no cuenta como suyo;
+  - que las apps de Apple y Margin quedan protegidas;
+  - que los restos de una app borrada se agrupan para revisar, sin confundirlos con los de apps instaladas;
+  - que el plan mueve solo lo elegido;
+  - que una app abierta bloquea su desinstalación;
+  - que las apps de Homebrew usan `brew uninstall --cask`;
+  - que /Applications queda vetada en modo de prueba, igual que las rutas anidadas;
+  - que la revalidación coincide con el informe.
+- **Fallo encontrado por las pruebas**: si la app se quitaba primero, sus restos dejaban de constar como suyos y el resto del plan se bloqueaba. Ahora el plan pone la app al final.
+- **Datos reales** (`margin apps --text`, 6 s, solo lectura):
+  - 48 apps, que ocupan 43,8 GB con sus restos. Claude 14 GB (13,3 GB de datos), Xcode 4 GB de la App Store, VS Code 3,4 GB, y Docker y Godot detectados como Homebrew.
+  - 943 MB en restos de apps borradas; el mayor es Whisky, con 822 MB.
+  - `com.openai.chat` aparece como resto porque la app «ChatGPT.app» instalada usa el identificador de Codex (`com.openai.codex`): es de la versión anterior.
+- **App, con clics y datos reales**:
+  - La lista muestra icono, origen, último uso y tamaño; el detalle de Claude, la app y cada resto con su explicación en inglés.
+  - «App y restos sin riesgo» marca 4 elementos y aparece la barra flotante.
+  - El plan pone los restos primero y la app al final, y bloquea todos los pasos porque Claude estaba abierta («Run 0 steps»). Se canceló.
+  - La vista de restos de apps borradas lista cada grupo con sus rutas.
+- **No se desinstaló nada real**. La vía de Finder para apps de root o de la App Store (contraseña) no se probó: pediría tu contraseña y movería una app real.
+- **MCP**: `apps_report` devuelve las apps con sus `id`, y `propose_cleanup` los acepta. La skill explica el flujo.
+- **Nota**: al lanzar el binario directamente sin ventanas guardadas, macOS no abre ninguna; abriendo la app de forma normal sí aparece. Es la restauración de ventanas de macOS, no un fallo.

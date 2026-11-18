@@ -137,7 +137,11 @@ Hecho después de la 0.8 (18-11-2026, «primero lo pendiente»):
 - **Aviso de poco espacio** opcional (Ajustes): un agente de inicio comprueba cada hora el espacio libre y avisa como mucho una vez al día, salvo que siga bajando.
 - **Acceso total al disco**: estado en Ajustes y atajo a Ajustes del Sistema (también desde la tarjeta de la Papelera).
 
-Siguiente propuesto: **0.9 · desinstalación completa de apps** (app y sus restos por identificador, a la Papelera con plan; Homebrew con `brew uninstall --cask`; restos de apps ya borradas como «revisar»).
+### 0.9 · Desinstalación completa de apps — ✅ hecha el 2026-11-18, ver VERIFICACION.md
+
+- Sección **Apps**, `margin apps` y herramienta MCP `apps_report`. Cada app con sus restos en `~/Library`, encontrados por identificador exacto; por nombre solo en Application Support, y entonces como «revisar».
+- Desinstalar va por plan, igual que el resto de la limpieza. La regla de rutas admite solo una app de primer nivel de /Applications: nunca en modo de prueba, nunca de Apple salvo las de la App Store, nunca Margin. Si macOS no deja moverla, la mueve Finder, que pide tu contraseña.
+- **Restos de apps ya borradas**: identificadores que ninguna app del Mac usa, comprobados con Spotlight, siempre como «revisar».
 
 Pendiente después de la 0.7:
 

@@ -2,11 +2,16 @@
 
 Margin mide tu disco y te ayuda a liberar espacio en el Mac sin sorpresas: nada se borra sin tu confirmación. Hasta la 0.6 se llamaba «Gestor de espacio para Mac» (`Gestor Espacio.app`, comando `espacio`) y durante unas horas de la 0.7, «Margen»; `espacio` y `margen` siguen funcionando como alias.
 
-Estado: versión local 0.8 (2026-11-18). Uso personal; interfaz en español e inglés. Swift + SwiftUI con Liquid Glass; requiere macOS 26 o posterior (validado en macOS 27 / Apple Silicon).
+Estado: versión local 0.9 (2026-11-18). Uso personal; interfaz en español e inglés. Swift + SwiftUI con Liquid Glass; requiere macOS 26 o posterior (validado en macOS 27 / Apple Silicon).
 
 ## Qué incluye
 
 - **Barra del disco** (pestaña Inicio y `margin disco --text`): el total del volumen repartido en apps, documentos y archivos, datos de apps y cachés, desarrollo, macOS, Papelera, purgable por macOS, otros y disponible, con tamaño y porcentaje. Se mide en segundo plano (unos 25 s), se guarda en caché y se actualiza sola al limpiar o vaciar la Papelera. «macOS» suma los volúmenes del sistema que informa `diskutil` y los recursos que descarga macOS; «otros» es lo que no se puede atribuir (datos protegidos de otras apps, carpetas sin permiso de lectura…).
+- **Apps** (0.9, sección Apps y `margin apps --text`): cada app con lo que ocupa junto con sus restos en `~/Library` y la última vez que la usaste (según Spotlight).
+  - **Desinstalar** es un plan como cualquier otro: los restos elegidos y la app van a la Papelera, primero los restos y la app al final. Si vino de Homebrew se usa `brew uninstall --cask`, y las de root o de la App Store las mueve Finder, que pide tu contraseña. Se bloquea si la app está abierta.
+  - **Restos por riesgo**: caché, estado de ventanas, datos web y registros son de bajo riesgo; datos, preferencias, contenedores y agentes de inicio, «revisar».
+  - **Protegidas**: las apps de Apple incluidas con macOS y Margin. Lo que está fuera de tu carpeta personal solo se informa.
+  - **Restos de apps ya borradas**: carpetas con el identificador de una app que no está instalada, siempre como «revisar».
 - **Diseño macOS 26** (0.8): barra lateral nativa sin títulos repetidos, acciones de cada sección en la barra de herramientas, búsqueda de Archivos en la barra, tarjetas y paneles de Liquid Glass sobre un fondo de color que cambia con la sección, barras de acción flotantes («Revisar y limpiar», «Revisar plan», «Mover a la Papelera») que aparecen solo cuando hay algo que hacer, ⌘1–⌘5 para saltar entre secciones. Animaciones: la barra del disco se llena al abrir y brilla mientras mide, las cifras cambian con transición, las tarjetas entran escalonadas, tarjetas de carga durante el análisis, el mapa se anima al entrar y salir de carpetas, iconos con efectos. Todo respeta «Reducir movimiento» y «Reducir transparencia» de macOS.
 - **Ajustes** (barra lateral o ⌘,): pestaña al abrir, medir el disco y hacer el análisis inteligente al abrir, días de inactividad y carpetas de proyectos, tema (sistema, claro u oscuro), idioma (sistema, español o inglés) y accesibilidad (colores aptos para daltonismo, más contraste, reducir movimiento). Las explicaciones detalladas de cada elemento siguen en español.
 

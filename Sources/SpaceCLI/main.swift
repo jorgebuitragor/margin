@@ -150,6 +150,27 @@ do {
         } else {
             try output(breakdown)
         }
+    case "apps":
+        // Apps instaladas con lo que ocupan sus restos, y restos de apps ya borradas. Solo lectura.
+        let env = baseEnvironment()
+        let report = AppInventory.report(env)
+        if args.contains("--text") {
+            let apps = report.apps.sorted { $0.totalBytes > $1.totalBytes }
+            for app in apps {
+                let used = app.lastUsed.map { " · usada hace \(Int(Date().timeIntervalSince($0) / 86_400)) días" } ?? ""
+                print("\(app.name) · \(size(app.totalBytes))\(used) · \(app.source.rawValue)\(app.protectedReason.map { " · protegida: \($0)" } ?? "")")
+                for item in app.items {
+                    print("    id \(item.shortID)  [\(item.category == .lowRisk ? "BAJO RIESGO" : "REVISAR")] \(item.title)  \(item.bytes.map { size($0) } ?? "sin medir")")
+                }
+                for path in app.systemLeftovers { print("    (sistema, no se toca) \(path)") }
+            }
+            if !report.orphans.isEmpty {
+                print("\nRestos de apps ya borradas:")
+                for item in report.orphans { print("    id \(item.shortID)  [REVISAR] \(item.title)  \(size(item.bytes))") }
+            }
+        } else {
+            try output(report)
+        }
     case "scan":
         args.removeFirst()
         var options = ScanOptions()
@@ -184,7 +205,9 @@ do {
         var items: [DevItem] = []
         if !args.isEmpty {
             print("Analizando perfiles para resolver los id…")
-            let all = DevProfiles.report(env).profiles.flatMap(\.items)
+            var all = DevProfiles.report(env).profiles.flatMap(\.items)
+            let apps = AppInventory.report(env, measure: false)
+            all += apps.apps.flatMap(\.items) + apps.orphans
             for id in args {
                 guard let item = all.first(where: { $0.shortID == id }) else { fail("No se encontró el id \(id) en el análisis actual.") }
                 items.append(item)
@@ -265,6 +288,7 @@ do {
     case "help", "--help", nil:
         print("""
         margin status         Diagnóstico de RAM y volumen en JSON.
+        margin apps           Apps con sus restos y restos de apps ya borradas, con id para `plan`. --text: legible.
         margin disco          Desglose del disco por categorías (apps, documentos, desarrollo…). --text: legible.
         margin scan /ruta     Totales por carpeta y archivos más grandes en JSON; solo lectura.
             --depth N         Profundidad de carpetas en el informe (por defecto 3).

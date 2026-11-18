@@ -11,6 +11,8 @@ public enum DevProfiles {
     public static func profile(_ id: String, _ env: DevEnvironment) -> ProfileResult? {
         let index = ["android-sdk", "project-artifacts", "gradle-maven"].contains(id) ? ProjectIndex.build(env) : ProjectIndex()
         switch id {
+        case AppInventory.profileID: return AppInventory.profile(env)
+        case AppInventory.orphanProfileID: return AppInventory.orphanProfile(env)
         case "android-sdk": return androidSDK(env, index)
         case "android-avd": return androidEmulators(env)
         case "ios-simulators": return iosSimulators(env)

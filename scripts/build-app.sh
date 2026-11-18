@@ -22,8 +22,8 @@ cat > "$app_dir/Contents/Info.plist" <<'PLIST'
 <key>CFBundleDisplayName</key><string>Margin</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.8.0</string>
-<key>CFBundleVersion</key><string>8</string>
+<key>CFBundleShortVersionString</key><string>0.9.0</string>
+<key>CFBundleVersion</key><string>9</string>
 <key>CFBundleDevelopmentRegion</key><string>es</string>
 <key>CFBundleLocalizations</key><array><string>es</string><string>en</string></array>
 <key>LSMinimumSystemVersion</key><string>26.0</string>
