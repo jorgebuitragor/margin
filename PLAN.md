@@ -1,4 +1,4 @@
-# Plan para completar el Gestor de espacio · 0.2 → 0.6
+# Plan de Margen (antes «Gestor de espacio») · 0.2 → 0.7
 
 Fecha: 2026-11-17. Parte de la versión 0.1 (ver [PROYECTO.md](PROYECTO.md) y [VERIFICACION.md](VERIFICACION.md)). Estado de partida: 9 pruebas XCTest pasan desde la nueva ubicación `~/Developer/gestor-espacio-mac`; repositorio git recién inicializado, sin commits.
 
@@ -94,7 +94,7 @@ Aquí aparece por primera vez la categoría **«Candidato de bajo riesgo»**, so
 - El MCP **no ejecuta**. Para ejecutar un plan hace falta `espacio apply <plan-id>` en la terminal del usuario o el botón «Aplicar» en la app. Así un modelo nunca obtiene autorización de borrado por sí mismo, como ya exige el PROYECTO.md.
 - Skill `liberar-espacio` para Claude Code: consulta el MCP, presenta el plan y le indica a Jorge el comando para aplicarlo. Sustituye las sesiones manuales.
 
-### 0.6 · Análisis inteligente y pulido (esfuerzo: medio) — 🟡 en curso
+### 0.6 · Análisis inteligente y pulido (esfuerzo: medio) — ✅ hecha el 2026-11-18 (salvo lo pendiente abajo)
 
 Hecho el 2026-11-17 (pedido por Jorge, al estilo de CleanMyMac):
 
@@ -116,6 +116,18 @@ Pendiente:
 
 - Comprobación manual del selector de carpetas del sistema, que corre en otro proceso y no se puede automatizar.
 - Opcional: aviso cuando el disco baje de un umbral (LaunchAgent ligero). Solo si Jorge lo quiere.
+
+### 0.7 · Barra del disco, ajustes, idiomas y nuevo nombre (pedido por Jorge) — ✅ hecha el 2026-11-18, ver VERIFICACION.md
+
+- **Barra del disco** en Inicio: el total del volumen por categorías (apps, documentos, datos de apps, desarrollo, macOS, Papelera, purgable, otros) y el disponible. Se mide en segundo plano con caché (`StorageAnalyzer`, `margen disco`) y el MCP la incluye en `disk_status`. Las demás pestañas muestran «disponible de total».
+- **Ajustes** (barra lateral y ⌘,): general, análisis (días de inactividad, carpetas de proyectos), tema, idioma, accesibilidad (paleta Okabe-Ito para daltonismo, más contraste, reducir movimiento) y datos.
+- **Idiomas**: español e inglés en caliente, con tamaños y fechas en el formato de cada idioma. Pendiente: las explicaciones que genera el análisis (motivo, consecuencia, notas) siguen en español.
+- **Nuevo nombre: Margen**. App `Margen.app` (`local.margen.mac`) con icono propio, comando `margen` (alias `espacio`), MCP `margen`, carpeta de datos `Margen` (migra la anterior) y variables `MARGEN_*` (las `ESPACIO_*` siguen valiendo). La carpeta del repositorio conserva su nombre.
+
+Pendiente después de la 0.7:
+
+- Traducir al inglés los textos del análisis (perfiles, clasificación, mensajes de los planes).
+- Aviso opcional de poco espacio (LaunchAgent ligero), solo si Jorge lo quiere.
 
 ## Decisiones que necesita Jorge
 

@@ -73,8 +73,8 @@ func printDev(_ report: DevReport) {
 }
 
 func baseEnvironment() -> DevEnvironment {
-    // ESPACIO_HOME permite probar de punta a punta sobre una carpeta personal sintética.
-    if let home = ProcessInfo.processInfo.environment["ESPACIO_HOME"] { return DevEnvironment(home: URL(fileURLWithPath: home)) }
+    // MARGEN_HOME permite probar de punta a punta sobre una carpeta personal sintética.
+    if let home = DevEnvironment.testSetting("HOME") { return DevEnvironment(home: URL(fileURLWithPath: home)) }
     return DevEnvironment()
 }
 
@@ -135,6 +135,21 @@ do {
     switch args.first {
     case "status" where args.count == 1:
         try output(Diagnostics.read())
+    case "disco":
+        // Desglose del volumen por categorías (lo mismo que la barra de la app). Mide y guarda la caché.
+        let env = baseEnvironment()
+        guard let breakdown = StorageAnalyzer.measure(env) else { fail("No se pudo leer la capacidad del volumen.") }
+        StorageAnalyzer.save(breakdown, env)
+        if args.contains("--text") {
+            let names: [StorageSegment.Kind: String] = [.apps: "Apps", .personal: "Documentos y archivos", .appData: "Datos de apps y cachés", .development: "Desarrollo", .macOS: "macOS", .trash: "Papelera", .purgeable: "Purgable por macOS", .system: "Otros"]
+            print("Disco: \(size(breakdown.total)) · usado \(size(breakdown.used)) · disponible \(size(breakdown.available))")
+            for segment in breakdown.segments {
+                let pct = Double(segment.bytes) / Double(max(breakdown.total, 1)) * 100
+                print("  \((names[segment.kind] ?? segment.kind.rawValue).padding(toLength: 24, withPad: " ", startingAt: 0)) \(size(segment.bytes).padding(toLength: 10, withPad: " ", startingAt: 0)) \(String(format: "%5.1f", pct)) %\(segment.partial ? "  (mínimo: hubo elementos ilegibles)" : "")")
+            }
+        } else {
+            try output(breakdown)
+        }
     case "scan":
         args.removeFirst()
         var options = ScanOptions()
@@ -143,7 +158,7 @@ do {
         if let max = intValue(&args, "--max-files") { options.maxEntries = max }
         let text = args.contains("--text")
         args.removeAll { $0 == "--text" }
-        guard args.count == 1 else { fail("Uso: espacio scan /ruta [--depth N] [--min-mb N] [--max-files N] [--text]") }
+        guard args.count == 1 else { fail("Uso: margen scan /ruta [--depth N] [--min-mb N] [--max-files N] [--text]") }
         let report = try Scanner.scan(root: URL(fileURLWithPath: args[0]), options: options)
         if text { printText(report, folders: 25, files: 15) } else { try output(report) }
     case "dev":
@@ -152,7 +167,7 @@ do {
         roots(&args, &env)
         let text = args.contains("--text")
         args.removeAll { $0 == "--text" }
-        guard args.isEmpty else { fail("Uso: espacio dev [--text] [--inactive-days N] [--roots ruta1,ruta2]") }
+        guard args.isEmpty else { fail("Uso: margen dev [--text] [--inactive-days N] [--roots ruta1,ruta2]") }
         let report = DevProfiles.report(env)
         if text { printDev(report) } else { try output(report) }
     case "plan":
@@ -165,7 +180,7 @@ do {
             files.append(DevEnvironment.canonical(NSString(string: args[index + 1]).expandingTildeInPath))
             args.removeSubrange(index...index + 1)
         }
-        guard !args.isEmpty || !files.isEmpty else { fail("Uso: espacio plan <id> [<id>…] [--file /ruta]… — los id salen en `espacio dev --text`.") }
+        guard !args.isEmpty || !files.isEmpty else { fail("Uso: margen plan <id> [<id>…] [--file /ruta]… — los id salen en `margen dev --text`.") }
         var items: [DevItem] = []
         if !args.isEmpty {
             print("Analizando perfiles para resolver los id…")
@@ -186,11 +201,11 @@ do {
         let plan = try Planner.plan(devItems: items, files: entries, env: env)
         try PlanStore.save(plan, env)
         printPlan(plan)
-        print("\nNo se ha ejecutado nada. Para aplicarlo (pedirá confirmación): espacio apply \(plan.id)")
+        print("\nNo se ha ejecutado nada. Para aplicarlo (pedirá confirmación): margen apply \(plan.id)")
     case "vaciar-papelera":
         // Única acción de borrado definitivo: terminal interactiva y escribir VACIAR.
-        if isatty(STDIN_FILENO) == 0 && ProcessInfo.processInfo.environment["ESPACIO_HOME"] == nil {
-            fail("espacio vaciar-papelera necesita una terminal interactiva.")
+        if isatty(STDIN_FILENO) == 0 && DevEnvironment.testSetting("HOME") == nil {
+            fail("margen vaciar-papelera necesita una terminal interactiva.")
         }
         let env = baseEnvironment()
         let trash = TrashStatus.read(env)
@@ -217,11 +232,11 @@ do {
         }
     case "apply":
         args.removeFirst()
-        guard args.count == 1 else { fail("Uso: espacio apply <plan>") }
+        guard args.count == 1 else { fail("Uso: margen apply <plan>") }
         // La confirmación es del usuario: se exige una terminal interactiva para que un proceso (o un agente)
-        // no pueda aplicar un plan enviando el código por una tubería. ESPACIO_HOME (modo de prueba) lo permite.
-        if isatty(STDIN_FILENO) == 0 && ProcessInfo.processInfo.environment["ESPACIO_HOME"] == nil {
-            fail("espacio apply necesita una terminal interactiva: ejecútalo tú y escribe el código del plan.")
+        // no pueda aplicar un plan enviando el código por una tubería. MARGEN_HOME (modo de prueba) lo permite.
+        if isatty(STDIN_FILENO) == 0 && DevEnvironment.testSetting("HOME") == nil {
+            fail("margen apply necesita una terminal interactiva: ejecútalo tú y escribe el código del plan.")
         }
         let base = baseEnvironment()
         let plan = try PlanStore.load(args[0], base)
@@ -249,24 +264,25 @@ do {
         print("Registro: \(env.supportDirectory)/acciones.jsonl")
     case "help", "--help", nil:
         print("""
-        espacio status        Diagnóstico de RAM y volumen en JSON.
-        espacio scan /ruta    Totales por carpeta y archivos más grandes en JSON; solo lectura.
+        margen status         Diagnóstico de RAM y volumen en JSON.
+        margen disco          Desglose del disco por categorías (apps, documentos, desarrollo…). --text: legible.
+        margen scan /ruta     Totales por carpeta y archivos más grandes en JSON; solo lectura.
             --depth N         Profundidad de carpetas en el informe (por defecto 3).
             --min-mb N        Omite carpetas menores de N MB (por defecto 1).
             --max-files N     Archivos individuales a listar, los más grandes (por defecto 20000).
             --text            Resumen legible en lugar de JSON.
-        espacio dev           Perfiles de desarrollo: cachés y artefactos regenerables con su comando oficial.
+        margen dev            Perfiles de desarrollo: cachés y artefactos regenerables con su comando oficial.
             --inactive-days N Días sin cambios para considerar inactivo un proyecto (por defecto 30).
             --roots a,b       Carpetas de proyectos (por defecto ~/Developer, ~/git, ~/projects…).
             --text            Resumen legible en lugar de JSON.
-        espacio plan <id>… [--file /ruta]…
+        margen plan <id>… [--file /ruta]…
                               Crea un plan con elementos de `dev` (id) o archivos revisables. No ejecuta nada.
-        espacio apply <plan>  Revalida, muestra vista previa y, si escribes el código del plan, ejecuta:
+        margen apply <plan>   Revalida, muestra vista previa y, si escribes el código del plan, ejecuta:
                               mueve a la Papelera o lanza el comando oficial de la herramienta.
-        espacio vaciar-papelera
+        margen vaciar-papelera
                               Vacía la Papelera (a través de Finder) tras escribir VACIAR. Es la única acción
                               de borrado definitivo y no la puede lanzar ningún agente.
-        espacio mcp           Servidor MCP por stdio para agentes (Claude Code, Codex): mide y crea planes,
+        margen mcp            Servidor MCP por stdio para agentes (Claude Code, Codex): mide y crea planes,
                               nunca los aplica.
         El borrado definitivo solo existe en vaciar-papelera. scan, dev, plan y mcp solo miden y proponen.
         Los totales siguen la lógica de du: espacio asignado, enlaces duros una vez, sin seguir enlaces.
@@ -274,7 +290,7 @@ do {
         Los informes incluyen rutas: comparte solo los datos que necesites.
         """)
     default:
-        fail("Comando inválido. Usa espacio --help.")
+        fail("Comando inválido. Usa margen --help.")
     }
 } catch {
     fail(error.localizedDescription)

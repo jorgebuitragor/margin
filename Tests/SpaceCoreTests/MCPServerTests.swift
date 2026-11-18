@@ -66,7 +66,7 @@ final class MCPServerTests: XCTestCase {
         XCTAssertFalse(planError, planText)
         let plan = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(planText.utf8)) as? [String: Any])
         let planID = try XCTUnwrap(plan["plan"] as? String)
-        XCTAssertEqual(plan["apply"] as? String, "espacio apply \(planID)")
+        XCTAssertEqual(plan["apply"] as? String, "margen apply \(planID)")
         XCTAssertTrue(FileManager.default.fileExists(atPath: home.appendingPathComponent("Developer/viejo/node_modules/pkg/index.js").path), "Proponer no mueve nada")
 
         let (result, _) = try callText("plan_result", ["plan": planID])

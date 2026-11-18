@@ -189,7 +189,27 @@ public struct DevEnvironment: Sendable {
         return String(cString: real)
     }
 
-    public var supportDirectory: String { path("Library/Application Support/GestorEspacio") }
+    /// Carpeta de datos (planes, registro, caché). Hasta la 0.6 la app se llamaba «Gestor Espacio»: si solo existe la
+    /// carpeta antigua, se renombra para conservar planes y registro.
+    public var supportDirectory: String {
+        let current = path("Library/Application Support/Margen")
+        let legacy = path("Library/Application Support/GestorEspacio")
+        let fm = FileManager.default
+        if !fm.fileExists(atPath: current) && fm.fileExists(atPath: legacy) { try? fm.moveItem(atPath: legacy, toPath: current) }
+        return current
+    }
+
+    /// Variable de prueba `MARGEN_<nombre>` (o la antigua `ESPACIO_<nombre>`).
+    public static func testSetting(_ name: String) -> String? {
+        let env = ProcessInfo.processInfo.environment
+        return env["MARGEN_\(name)"] ?? env["ESPACIO_\(name)"]
+    }
+
+    /// Entorno real, o una carpeta personal sintética con MARGEN_HOME para probar de punta a punta.
+    public static func fromProcess(projectRoots: [URL]? = nil, inactiveDays: Int = 30) -> DevEnvironment {
+        if let home = testSetting("HOME") { return DevEnvironment(home: URL(fileURLWithPath: home), projectRoots: projectRoots, inactiveDays: inactiveDays) }
+        return DevEnvironment(projectRoots: projectRoots, inactiveDays: inactiveDays)
+    }
 
     func days(since date: Date?) -> Int? {
         date.map { Int(now.timeIntervalSince($0) / 86_400) }
