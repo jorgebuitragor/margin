@@ -147,9 +147,28 @@ final class AppModel: ObservableObject {
     func analyzeDev() {
         devBusy = true
         Task {
-            let report = await Task.detached(priority: .userInitiated) { DevProfiles.report(appEnvironment()) }.value
+            let env = appEnvironment()
+            let (report, trashStatus) = await Task.detached(priority: .userInitiated) { (DevProfiles.report(env), TrashStatus.read(env)) }.value
             dev = report
+            trash = trashStatus
+            diagnostics = Diagnostics.read()
             devBusy = false
+        }
+    }
+
+    // Papelera: única acción de borrado definitivo, con diálogo propio.
+    @Published var trash: TrashStatus?
+    @Published var emptying = false
+    @Published var emptyResult: TrashEmptier.Result?
+    func emptyTrash() {
+        emptying = true
+        Task {
+            let env = appEnvironment()
+            let result = await Task.detached(priority: .userInitiated) { TrashEmptier.empty(env: env) }.value
+            emptyResult = result
+            trash = TrashStatus.read(env)
+            diagnostics = Diagnostics.read()
+            emptying = false
         }
     }
 }
@@ -181,7 +200,8 @@ struct ContentView: View {
     @State private var selected = Set<String>()
     @State private var devChecked = Set<String>()
     @State private var acceptReview = false
-    @State private var tab = "Carpetas"
+    @State private var tab = "Inicio"
+    @State private var confirmEmpty = false
     private let accent = Color(red: 0.12, green: 0.58, blue: 0.48)
     var filtered: [FileEntry] {
         (model.report?.entries ?? []).filter {
@@ -198,16 +218,16 @@ struct ContentView: View {
                 Label("Espacio", systemImage: "internaldrive.fill")
                     .font(.largeTitle.bold()).foregroundStyle(accent).padding(.top, 24)
                 Text("CONOCE TU MAC").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                ForEach(["Carpetas", "Archivos", "Desarrollo", "Memoria RAM"], id: \.self) { item in
+                ForEach(["Inicio", "Limpieza", "Carpetas", "Archivos", "Memoria RAM"], id: \.self) { item in
                     Button { tab = item } label: {
-                        Label(item, systemImage: item == "Carpetas" ? "folder" : item == "Archivos" ? "doc" : item == "Desarrollo" ? "hammer" : "memorychip")
+                        Label(item, systemImage: item == "Inicio" ? "sparkles" : item == "Carpetas" ? "folder" : item == "Archivos" ? "doc" : item == "Limpieza" ? "hammer" : "memorychip")
                             .frame(maxWidth: .infinity, alignment: .leading).padding(10)
                             .background(tab == item ? accent.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 9))
                     }.buttonStyle(.plain)
                 }
                 Spacer()
                 Label("Nada sin tu confirmación", systemImage: "checkmark.shield").foregroundStyle(accent)
-                Text("Solo Papelera o el comando oficial de cada herramienta; nunca borrado permanente.\nVersión local 0.5").font(.caption).foregroundStyle(.secondary)
+                Text("Solo Papelera o el comando oficial de cada herramienta. El único borrado definitivo es «Vaciar Papelera».\nVersión local 0.6").font(.caption).foregroundStyle(.secondary)
             }.padding(20)
             .navigationSplitViewColumnWidth(220)
         } detail: {
@@ -215,22 +235,35 @@ struct ContentView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(tab == "Memoria RAM" ? "Entiende tu memoria" : "Entiende qué ocupa espacio").font(.title.bold())
-                        Text(tab == "Carpetas" ? "Cuánto ocupa cada carpeta, incluidas las protegidas." : tab == "Desarrollo" ? "Cachés y artefactos regenerables, con el comando oficial de cada herramienta." : tab == "Archivos" ? "Revisa cada archivo con contexto antes de decidir." : "Mediciones reales, sin promesas de aceleración.").foregroundStyle(.secondary)
+                        Text(tab == "Inicio" ? "Análisis inteligente: los lugares donde suele acumularse espacio, en menos de un minuto." : tab == "Carpetas" ? "Cuánto ocupa cada carpeta, incluidas las protegidas." : tab == "Limpieza" ? "Cada elemento con su causa, su coste y el comando oficial de su herramienta." : tab == "Archivos" ? "Revisa cada archivo con contexto antes de decidir." : "Mediciones reales, sin promesas de aceleración.").foregroundStyle(.secondary)
                     }
                     Spacer()
-                    if tab == "Desarrollo" {
-                        Button(model.dev == nil ? "Analizar" : "Volver a analizar", systemImage: "hammer") { model.analyzeDev() }.buttonStyle(.borderedProminent).tint(accent).disabled(model.devBusy)
+                    if tab == "Limpieza" || tab == "Inicio" {
+                        Button(model.dev == nil ? "Analizar" : "Volver a analizar", systemImage: "sparkles") { model.analyzeDev() }.buttonStyle(.borderedProminent).tint(accent).disabled(model.devBusy)
                     } else if tab != "Memoria RAM" {
                         Button("Elegir carpeta…", systemImage: "folder.badge.plus") { model.choose() }.buttonStyle(.borderedProminent).tint(accent)
                     } else {
                         Button("Actualizar", systemImage: "arrow.clockwise") { model.diagnostics = Diagnostics.read() }
                     }
                 }
-                if tab == "Carpetas" { folders } else if tab == "Archivos" { files } else if tab == "Desarrollo" { development } else { memory }
+                if tab == "Inicio" { home } else if tab == "Carpetas" { folders } else if tab == "Archivos" { files } else if tab == "Limpieza" { development } else { memory }
             }.padding(28)
         }
         .tint(accent)
         .sheet(item: $model.pendingPlan) { plan in confirmation(plan) }
+        .alert("¿Vaciar la Papelera?", isPresented: $confirmEmpty) {
+            Button("Cancelar", role: .cancel) {}
+            Button("Vaciar definitivamente", role: .destructive) { model.emptyTrash() }
+        } message: {
+            Text("\(model.trash?.items.map { "Se borrarán \($0) \($0 == 1 ? "elemento" : "elementos") (\(size(model.trash?.bytes))). " } ?? "")Lo que hay en la Papelera se borra para siempre y no se puede recuperar. Finder se encarga de vaciarla; la primera vez macOS te pedirá permiso para que esta app controle Finder.")
+        }
+        .alert(model.emptyResult?.status == .done ? "Papelera vaciada" : "No se pudo vaciar la Papelera", isPresented: Binding(get: { model.emptyResult != nil }, set: { if !$0 { model.emptyResult = nil } })) {
+            Button("Aceptar", role: .cancel) {}
+        } message: {
+            if let result = model.emptyResult {
+                Text("\(result.message) Espacio disponible: antes \(size(result.availableBefore)), después \(size(result.availableAfter)).")
+            }
+        }
         .sheet(item: Binding(get: { model.applyReport.map { ReportBox(report: $0) } }, set: { if $0 == nil { model.applyReport = nil } })) { box in results(box.report) }
         .alert("No se pudo preparar el plan", isPresented: Binding(get: { model.planError != nil }, set: { if !$0 { model.planError = nil } })) {
             Button("Aceptar", role: .cancel) {}
@@ -339,6 +372,77 @@ struct ContentView: View {
             }
         }
     }
+    /// Grupos del análisis inteligente: qué perfiles suma cada tarjeta.
+    static let groups: [(title: String, icon: String, ids: Set<String>)] = [
+        ("Desarrollo", "hammer", Set(DevProfiles.ids).subtracting(DevProfiles.generalIDs)),
+        ("Cachés de apps", "square.stack.3d.up", ["app-caches"]),
+        ("Registros", "doc.text", ["logs"]),
+        ("Descargas", "arrow.down.circle", ["downloads"]),
+        ("Copias de iPhone", "iphone", ["ios-backups"])
+    ]
+    var home: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if let report = model.dev {
+                let items = report.profiles.flatMap(\.items)
+                let lowRisk = items.filter { $0.category == .lowRisk && $0.canDelete }
+                HStack(spacing: 14) {
+                    metric("Recuperable sin riesgo", size(report.lowRiskBytes), "checkmark.circle")
+                    metric("Para revisar", size(report.reviewBytes), "eye")
+                    metric("Disponible ahora", size(model.diagnostics.diskAvailable), "internaldrive")
+                }
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                    ForEach(Self.groups, id: \.title) { group in
+                        let groupItems = report.profiles.filter { group.ids.contains($0.id) }.flatMap(\.items)
+                        let low = groupItems.filter { $0.category == .lowRisk }.reduce(Int64(0)) { $0 + ($1.recoverable ?? 0) }
+                        let review = groupItems.filter { $0.category == .review }.reduce(Int64(0)) { $0 + ($1.recoverable ?? 0) }
+                        card(group.title, group.icon, primary: size(low), detail: review > 0 ? "y \(size(review)) para revisar" : (groupItems.isEmpty ? "Nada que proponer" : "Nada para revisar")) {
+                            Button("Ver detalle") { tab = "Limpieza" }.buttonStyle(.link)
+                        }
+                    }
+                    card("Papelera", "trash", primary: model.trash?.bytes.map { size($0) } ?? "Tamaño desconocido",
+                         detail: model.trash?.items.map { "\($0) \($0 == 1 ? "elemento" : "elementos") · se libera al vaciarla" } ?? "macOS no deja leerla sin «Acceso total al disco»") {
+                        Button(model.emptying ? "Vaciando…" : "Vaciar Papelera…", role: .destructive) { confirmEmpty = true }
+                            .disabled(model.emptying || model.trash?.items == 0)
+                    }
+                }
+                HStack {
+                    Text("«Revisar y limpiar» incluye solo lo de bajo riesgo (\(lowRisk.count) \(lowRisk.count == 1 ? "elemento" : "elementos")). Lo marcado «para revisar» se elige uno por uno en Limpieza. Antes de ejecutar verás el plan completo.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    if model.preparing { ProgressView().controlSize(.small) }
+                    Button("Revisar y limpiar (\(size(lowRisk.reduce(Int64(0)) { $0 + ($1.recoverable ?? 0) })))…", systemImage: "sparkles") {
+                        model.prepare(devItems: lowRisk)
+                    }.buttonStyle(.borderedProminent).tint(accent).disabled(lowRisk.isEmpty || model.preparing || model.applying)
+                }
+                Spacer()
+            } else if model.devBusy {
+                VStack(spacing: 14) {
+                    ProgressView()
+                    Text("Revisando cachés, registros, descargas, herramientas de desarrollo y la Papelera…").foregroundStyle(.secondary)
+                }.frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                VStack(spacing: 18) {
+                    Image(systemName: "sparkles").font(.system(size: 54)).foregroundStyle(accent)
+                    Text("Análisis inteligente").font(.title2.bold())
+                    Text("Revisa en menos de un minuto los lugares donde se acumula espacio: cachés de apps, registros, instaladores viejos, herramientas de desarrollo y la Papelera. No borra nada sin tu confirmación.")
+                        .multilineTextAlignment(.center).foregroundStyle(.secondary).frame(maxWidth: 520)
+                    Button("Analizar ahora", systemImage: "sparkles") { model.analyzeDev() }.buttonStyle(.borderedProminent).tint(accent).controlSize(.large)
+                }.frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+    }
+    func card<Actions: View>(_ title: String, _ icon: String, primary: String, detail: String, @ViewBuilder actions: () -> Actions) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(title, systemImage: icon).font(.headline)
+            Text(primary).font(.title2.weight(.semibold)).monospacedDigit()
+            Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+            actions()
+        }
+        .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading).padding(16)
+        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .contain)
+    }
+
     @State private var devSelection: String?
     var development: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -410,7 +514,7 @@ struct ContentView: View {
                         .disabled(checked.isEmpty || model.preparing || model.applying)
                 }
             } else if !model.devBusy {
-                ContentUnavailableView("Analiza tus herramientas de desarrollo", systemImage: "hammer", description: Text("Android SDK y emuladores, simuladores y Xcode, node_modules de proyectos inactivos, pnpm, Gradle, Docker, Homebrew…"))
+                ContentUnavailableView("Analiza qué se puede limpiar", systemImage: "hammer", description: Text("Cachés de apps, registros, descargas, Android SDK y emuladores, simuladores y Xcode, node_modules de proyectos inactivos, pnpm, Gradle, Docker, Homebrew…"))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }

@@ -4,6 +4,8 @@ import Foundation
 public struct ProcessCheck: Codable, Sendable, Equatable {
     public let label: String
     public let pattern: String
+    /// Si se indica, se comprueba la app por su identificador (`lsappinfo find bundleid=…`) en lugar de `pgrep`.
+    public var bundleID: String? = nil
     public static let xcode = ProcessCheck(label: "Xcode", pattern: "Xcode.app/Contents/MacOS/Xcode")
     public static let simulator = ProcessCheck(label: "Simulator", pattern: "Simulator.app/Contents/MacOS/Simulator")
     public static let emulator = ProcessCheck(label: "el emulador de Android", pattern: "qemu-system-")

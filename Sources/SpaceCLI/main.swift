@@ -177,6 +177,27 @@ do {
         try PlanStore.save(plan, env)
         printPlan(plan)
         print("\nNo se ha ejecutado nada. Para aplicarlo (pedirá confirmación): espacio apply \(plan.id)")
+    case "vaciar-papelera":
+        // Única acción de borrado definitivo: terminal interactiva y escribir VACIAR.
+        if isatty(STDIN_FILENO) == 0 && ProcessInfo.processInfo.environment["ESPACIO_HOME"] == nil {
+            fail("espacio vaciar-papelera necesita una terminal interactiva.")
+        }
+        let env = baseEnvironment()
+        let trash = TrashStatus.read(env)
+        if let bytes = trash.bytes, let items = trash.items {
+            print("La Papelera tiene \(items) \(items == 1 ? "elemento" : "elementos") (\(size(bytes))).")
+        } else {
+            print("macOS no deja leer la Papelera sin «Acceso total al disco»: no se puede mostrar su tamaño.")
+        }
+        print("Vaciarla BORRA DEFINITIVAMENTE lo que contiene. No se puede deshacer.")
+        print("Para continuar escribe VACIAR y pulsa Intro. Cualquier otra cosa cancela: ", terminator: "")
+        fflush(stdout)
+        guard readLine()?.trimmingCharacters(in: .whitespaces) == "VACIAR" else { print("Cancelado. No se ha tocado nada."); exit(0) }
+        let result = TrashEmptier.empty(env: env)
+        print("\(result.status == .done ? "✓" : "✗") \(result.message)")
+        if result.status == .blocked { exit(1) }
+        if result.status != .done, let output = result.output { print(output) }
+        print("Espacio disponible: antes \(size(result.availableBefore)), después \(size(result.availableAfter))\(result.freedObserved.map { " (\($0 >= 0 ? "+" : "")\(formatBytes($0)))" } ?? "").")
     case "mcp":
         // Servidor MCP por stdio. Nada se escribe en stdout salvo respuestas JSON-RPC.
         let server = MCPServer(env: baseEnvironment())
@@ -234,9 +255,12 @@ do {
                               Crea un plan con elementos de `dev` (id) o archivos revisables. No ejecuta nada.
         espacio apply <plan>  Revalida, muestra vista previa y, si escribes el código del plan, ejecuta:
                               mueve a la Papelera o lanza el comando oficial de la herramienta.
+        espacio vaciar-papelera
+                              Vacía la Papelera (a través de Finder) tras escribir VACIAR. Es la única acción
+                              de borrado definitivo y no la puede lanzar ningún agente.
         espacio mcp           Servidor MCP por stdio para agentes (Claude Code, Codex): mide y crea planes,
                               nunca los aplica.
-        Nunca hay borrado permanente. scan, dev, plan y mcp solo miden y proponen.
+        El borrado definitivo solo existe en vaciar-papelera. scan, dev, plan y mcp solo miden y proponen.
         Los totales siguen la lógica de du: espacio asignado, enlaces duros una vez, sin seguir enlaces.
         Carpetas protegidas y sincronizadas se miden, pero sus archivos no se listan ni son accionables.
         Los informes incluyen rutas: comparte solo los datos que necesites.

@@ -1,6 +1,6 @@
 ---
 name: liberar-espacio
-description: Libera espacio en el Mac de Jorge con su Gestor de espacio (servidor MCP `gestor-espacio` o CLI `espacio`). Úsala cuando pida liberar espacio, limpiar el disco, saber qué ocupa espacio o revisar cachés de desarrollo (Android, Xcode, simuladores, node_modules, pnpm, Gradle, Docker, Homebrew). Mide y crea planes; aplicarlos es siempre decisión de Jorge en su terminal.
+description: Libera espacio en el Mac de Jorge con su Gestor de espacio (servidor MCP `gestor-espacio` o CLI `espacio`). Úsala cuando pida liberar espacio, limpiar el disco, saber qué ocupa espacio o revisar cachés de apps y de desarrollo (Chrome, Firefox, Go, Android, Xcode, simuladores, node_modules, pnpm, Gradle, Docker, Homebrew), registros o instaladores viejos. Mide y crea planes; aplicarlos es siempre decisión de Jorge en su terminal.
 ---
 
 # Liberar espacio con el Gestor de espacio
@@ -12,12 +12,12 @@ El proyecto vive en `~/Developer/gestor-espacio-mac` (ver su `README.md` y `PLAN
 
 ## Regla que no se negocia
 
-**Tú nunca aplicas un plan.** No ejecutes `espacio apply` (tampoco con `echo … |`, `run_in_terminal` ni ningún otro medio), no borres, no muevas a la Papelera y no lances tú los comandos de limpieza (`pnpm store prune`, `brew cleanup`, `xcrun simctl delete`…). Tu trabajo termina al entregar el código del plan; Jorge lo aplica escribiéndolo en su terminal. `espacio apply` exige una terminal interactiva precisamente por esto.
+**Tú nunca aplicas un plan.** No ejecutes `espacio apply` (tampoco con `echo … |`, `run_in_terminal` ni ningún otro medio), no borres, no muevas a la Papelera y no lances tú los comandos de limpieza (`pnpm store prune`, `brew cleanup`, `xcrun simctl delete`…). Tu trabajo termina al entregar el código del plan; Jorge lo aplica escribiéndolo en su terminal. `espacio apply` exige una terminal interactiva precisamente por esto. Lo mismo vale para **vaciar la Papelera** (`espacio vaciar-papelera` o el botón de la app): es la única acción de borrado definitivo y solo la hace Jorge; tú, como mucho, le recuerdas que lo movido a la Papelera no libera espacio hasta vaciarla.
 
 ## Flujo
 
 1. **Estado**: `disk_status` → espacio disponible.
-2. **Qué se puede recuperar**: `dev_report` (unos 30 s). Si Jorge pregunta qué ocupa el disco en general, añade `scan_folder` con `path: "~"`, `depth: 2`, `min_mb: 500` (unos 3 min; avísale de la espera).
+2. **Qué se puede recuperar**: `dev_report` (unos 12 s; incluye cachés de apps, registros y Descargas). Si Jorge pregunta qué ocupa el disco en general, añade `scan_folder` con `path: "~"`, `depth: 2`, `min_mb: 500` (unos 3 min; avísale de la espera).
 3. **Presenta** en español, agrupado por categoría y ordenado por espacio recuperable:
    - *Candidato de bajo riesgo*: regenerable, con la causa y el coste de regenerar.
    - *Revisar antes de borrar*: explica por qué hay que mirarlo (datos de emuladores, máquina virtual de Claude, versiones de Node con herramientas globales…).

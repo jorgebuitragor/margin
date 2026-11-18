@@ -164,3 +164,27 @@ Fecha local: 17 de noviembre de 2026. Mismo Mac.
 - Espacio disponible: 19,68 GB → 20,72 GB (+1,05 GB observado; la diferencia con lo que informa pnpm se debe a la actividad del sistema y a APFS).
 - Queda el store `v10` (643 MB), que pertenece a la otra versión de pnpm (12.4.2, en Node 20.11.0). El perfil lo mide junto al `v11` y solo propone un `prune`: mejora pendiente para la 0.6.
 - Corregido el 17-11-2026: el perfil crea un elemento por store de pnpm. Pregunta a cada pnpm instalado (`pnpm store path`, de solo lectura), propone `store prune` con el binario exacto que usa ese store y marca como «sin uso» el store que ninguna versión instalada declara (aquí `v10`: 673,8 MB recuperables, que van a la Papelera). Si no se puede consultar a ningún pnpm, el store huérfano queda «para revisar». 44 pruebas.
+
+# Verificación · 0.6 (análisis inteligente y Vaciar Papelera)
+
+Fecha local: 17 de noviembre de 2026. Mismo Mac.
+
+- `swift test`: **52 pruebas, 0 fallos**. Las 8 nuevas cubren:
+  - la clasificación de cachés: las de macOS y Homebrew se excluyen, las conocidas quedan en bajo riesgo con su app, las que tienen forma de identificador se comprueban por `lsappinfo` y las desconocidas quedan para revisar;
+  - el bloqueo cuando la app está abierta, comprobado por su identificador;
+  - los registros, y los instaladores antiguos de Descargas, que quedan para revisar (ni recientes ni fotos);
+  - que una carpeta Descargas sincronizada se ignora;
+  - que vaciar la Papelera lanza un único comando fijo a Finder y queda registrado;
+  - que vaciar nunca forma parte de un plan ni del MCP;
+  - que con una carpeta personal de prueba la Papelera real no se vacía;
+  - que los perfiles se ejecutan en paralelo y conservan el orden.
+- Análisis completo en este Mac: **unos 12 s** (antes, 37 s en secuencia). Nuevos elementos encontrados: caché de Chrome (400 MB), Firefox (387 MB) y Go (193 MB) como bajo riesgo; `dotslash` (542 MB, dueño desconocido) para revisar; registros (149 MB); 21 instaladores de más de 30 días en Descargas (16 MB). Las copias de iPhone y la Papelera no se pueden leer sin «Acceso total al disco»; la app lo indica.
+- Recorrido visual sobre una carpeta de prueba:
+  - **Inicio**: estado vacío, análisis, tarjetas con sumas por categoría, «Ver detalle».
+  - **«Revisar y limpiar»**: el plan de bajo riesgo marcó «Caché de Firefox» como **no se ejecutará: cierra Firefox**, porque Firefox estaba abierto de verdad.
+  - **«Vaciar Papelera…»**: el diálogo destructivo se abrió y se canceló.
+- Corregido durante la prueba:
+  - en modo de prueba, el diálogo mostraba la Papelera sintética pero Finder habría vaciado la real; ahora el vaciado se bloquea si la carpeta personal no es la real (con prueba de regresión);
+  - plurales («1 elementos», «1 carpetas»).
+- No probado: el vaciado real con Finder, que lo hará Jorge. La primera vez macOS pedirá permiso de Automatización para controlar Finder.
+- En modo de prueba, los perfiles que consultan herramientas reales (por ejemplo `brew --cache`) siguen apuntando a datos reales. No hay que ejecutar planes en ese modo.

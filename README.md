@@ -1,6 +1,6 @@
 # Gestor de espacio para Mac
 
-Estado: versión local 0.5 (2026-11-17). Núcleo, CLI e instalación verificados; recorrido visual completo pendiente. Uso personal; interfaz en español. Swift + SwiftUI, macOS 14 como mínimo declarado; validado en macOS 26 / Apple Silicon. No validado en macOS 14 ni Intel.
+Estado: versión local 0.6 en curso (2026-11-17). Núcleo, CLI e instalación verificados; recorrido visual completo pendiente. Uso personal; interfaz en español. Swift + SwiftUI, macOS 14 como mínimo declarado; validado en macOS 26 / Apple Silicon. No validado en macOS 14 ni Intel.
 
 ## Qué incluye
 
@@ -8,11 +8,13 @@ Estado: versión local 0.5 (2026-11-17). Núcleo, CLI e instalación verificados
 - **Carpetas protegidas medidas**: `Library`, paquetes, `node_modules`, `.build`, `.git`, configuración y credenciales muestran cuánto ocupan, pero sus archivos no se listan y nunca son accionables.
 - **Detección de sincronización**: Google Drive en modo espejo (marcadores `.tmp.driveupload`/`.tmp.drivedownload`), Dropbox, `~/Library/CloudStorage` (Google Drive, OneDrive, Box…) e iCloud. Lo sincronizado se mide y queda protegido; si la carpeta analizada está dentro de una sincronizada, todo el informe es solo de medida.
 - **Archivos más grandes** fuera de zonas protegidas, con clasificación y explicación: revisar, protegido o no determinado. «Candidato de bajo riesgo» solo lo asignan los perfiles de desarrollo, nunca el análisis genérico de archivos.
-- **Perfiles de desarrollo** (`espacio dev`, pestaña Desarrollo): SDK de Android, emuladores, simuladores y runtimes de iOS, Xcode, artefactos de proyectos (`node_modules`, `.build`, `build`, `target`, `Pods`…), pnpm/npm/yarn, Gradle y Maven, Docker, Homebrew, versiones de Node (nvm), Claude Desktop y VS Code. Cada elemento trae tamaño, recuperable estimado, causa, coste de regenerarlo y el comando oficial de la herramienta dueña.
-- App nativa con pestañas Carpetas (árbol con tamaños), Archivos, Desarrollo y Memoria RAM; análisis en segundo plano con cancelación.
+- **Análisis inteligente** (pestaña Inicio): en unos 12 s revisa lugares conocidos —cachés de apps (Chrome, Firefox, Go, apps por identificador; nunca las de macOS), registros, instaladores de más de 30 días en Descargas, copias de iPhone, herramientas de desarrollo y la Papelera— y muestra tarjetas por categoría con un botón «Revisar y limpiar» (solo bajo riesgo, con la confirmación de siempre).
+- **Vaciar Papelera** (botón en Inicio o `espacio vaciar-papelera`): la **única** acción de borrado definitivo, autorizada expresamente. Va aparte de los planes, la hace Finder, pide su propia confirmación (diálogo destructivo; en la CLI, escribir VACIAR en una terminal interactiva), no la proponen los perfiles ni la expone el MCP, y nunca se ejecuta con una carpeta personal de prueba.
+- **Perfiles de desarrollo** (`espacio dev`, pestaña Limpieza): SDK de Android, emuladores, simuladores y runtimes de iOS, Xcode, artefactos de proyectos (`node_modules`, `.build`, `build`, `target`, `Pods`…), pnpm/npm/yarn, Gradle y Maven, Docker, Homebrew, versiones de Node (nvm), Claude Desktop y VS Code. Cada elemento trae tamaño, recuperable estimado, causa, coste de regenerarlo y el comando oficial de la herramienta dueña.
+- App nativa con pestañas Inicio, Limpieza, Carpetas (árbol con tamaños), Archivos y Memoria RAM; análisis en segundo plano con cancelación.
 - CLI `espacio` con JSON para agentes y `--text` para la terminal, y **servidor MCP** (`espacio mcp`) con la skill `liberar-espacio` para Claude Code.
 
-- **Liberar espacio con confirmación** (`espacio plan` + `espacio apply`, o «Revisar plan…» / «Mover a la Papelera…» en la app): las únicas escrituras posibles son mover a la Papelera o ejecutar el comando oficial de la herramienta dueña. **Nunca hay borrado permanente**, ni siquiera como alternativa si la Papelera falla.
+- **Liberar espacio con confirmación** (`espacio plan` + `espacio apply`, o «Revisar plan…» / «Mover a la Papelera…» en la app): las únicas escrituras posibles son mover a la Papelera o ejecutar el comando oficial de la herramienta dueña. **Fuera de «Vaciar Papelera» no hay borrado definitivo**, ni siquiera como alternativa si la Papelera falla.
 
 `scan` y `dev` no modifican nada. No se leen contenidos, no se detectan duplicados y no se descargan archivos de la nube. Los totales son espacio ocupado, no espacio recuperable.
 

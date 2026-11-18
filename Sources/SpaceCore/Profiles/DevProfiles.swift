@@ -5,7 +5,7 @@ import Foundation
 public enum DevProfiles {
     public static let version = 1
 
-    public static let ids = ["android-sdk", "android-avd", "ios-simulators", "xcode", "project-artifacts", "js-packages", "gradle-maven", "docker", "homebrew", "node-versions", "claude-desktop", "vscode"]
+    public static let ids = ["android-sdk", "android-avd", "ios-simulators", "xcode", "project-artifacts", "js-packages", "gradle-maven", "docker", "homebrew", "node-versions", "claude-desktop", "vscode", "app-caches", "logs", "downloads", "ios-backups"]
 
     /// Recalcula un solo perfil (para revalidar un plan antes de actuar).
     public static func profile(_ id: String, _ env: DevEnvironment) -> ProfileResult? {
@@ -23,17 +23,26 @@ public enum DevProfiles {
         case "node-versions": return nodeVersions(env)
         case "claude-desktop": return claudeDesktop(env)
         case "vscode": return vscode(env)
+        case "app-caches": return appCaches(env)
+        case "logs": return logs(env)
+        case "downloads": return downloads(env)
+        case "ios-backups": return iosBackups(env)
         default: return nil
         }
     }
 
     public static func report(_ env: DevEnvironment = DevEnvironment()) -> DevReport {
         let index = ProjectIndex.build(env)
-        let profiles: [ProfileResult] = [
-            androidSDK(env, index), androidEmulators(env), iosSimulators(env), xcode(env),
-            projectArtifacts(env, index), jsPackages(env), gradleMaven(env, index), docker(env),
-            homebrew(env), nodeVersions(env), claudeDesktop(env), vscode(env)
+        let builders: [@Sendable () -> ProfileResult] = [
+            { androidSDK(env, index) }, { androidEmulators(env) }, { iosSimulators(env) }, { xcode(env) },
+            { projectArtifacts(env, index) }, { jsPackages(env) }, { gradleMaven(env, index) }, { docker(env) },
+            { homebrew(env) }, { nodeVersions(env) }, { claudeDesktop(env) }, { vscode(env) },
+            { appCaches(env) }, { logs(env) }, { downloads(env) }, { iosBackups(env) }
         ]
+        // Los perfiles son independientes y casi todo es E/S: se miden en paralelo, conservando el orden.
+        let box = ResultBox(count: builders.count)
+        DispatchQueue.concurrentPerform(iterations: builders.count) { i in box.set(i, builders[i]()) }
+        let profiles = box.values
         return DevReport(date: env.now, profiles: profiles, projectRoots: env.projectRoots.map(\.path), inactiveDays: env.inactiveDays)
     }
 
@@ -486,6 +495,14 @@ public enum DevProfiles {
         }
         return result
     }
+}
+
+final class ResultBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var slots: [ProfileResult?]
+    init(count: Int) { slots = Array(repeating: nil, count: count) }
+    func set(_ i: Int, _ value: ProfileResult) { lock.withLock { slots[i] = value } }
+    var values: [ProfileResult] { lock.withLock { slots.compactMap { $0 } } }
 }
 
 enum DevEnvironmentHelpers {

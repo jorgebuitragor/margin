@@ -94,7 +94,15 @@ Aquí aparece por primera vez la categoría **«Candidato de bajo riesgo»**, so
 - El MCP **no ejecuta**. Para ejecutar un plan hace falta `espacio apply <plan-id>` en la terminal del usuario o el botón «Aplicar» en la app. Así un modelo nunca obtiene autorización de borrado por sí mismo, como ya exige el PROYECTO.md.
 - Skill `liberar-espacio` para Claude Code: consulta el MCP, presenta el plan y le indica a Jorge el comando para aplicarlo. Sustituye las sesiones manuales.
 
-### 0.6 · Pulido (esfuerzo: medio)
+### 0.6 · Análisis inteligente y pulido (esfuerzo: medio) — 🟡 en curso
+
+Hecho el 2026-11-17 (pedido por Jorge, al estilo de CleanMyMac):
+
+- Pantalla **Inicio** con «Análisis inteligente» (perfiles en paralelo, unos 12 s) y tarjetas por categoría; «Revisar y limpiar» crea un plan solo con lo de bajo riesgo.
+- Perfiles generales: cachés de apps (no las de macOS), registros, instaladores viejos en Descargas, copias de iPhone.
+- **Vaciar Papelera**, la única acción de borrado definitivo, autorizada expresamente por Jorge: va aparte de los planes, la hace Finder, tiene confirmación propia, no la propone ningún perfil ni la expone el MCP y está bloqueada en modo de prueba.
+
+Pendiente de esta versión:
 
 - Validar la interfaz de punta a punta: selector, filtros, detalle, cancelación y teclado. Pendiente desde la 0.1.
 - Vista visual del árbol (treemap o sunburst) para la pestaña Almacenamiento.

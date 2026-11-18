@@ -174,6 +174,10 @@ public struct DevEnvironment: Sendable {
 
     /// Hay un proceso cuya línea de comandos contiene el patrón (consulta de solo lectura con pgrep).
     public func isRunning(_ check: ProcessCheck) -> Bool {
+        if let bundle = check.bundleID, let lsappinfo = tool("lsappinfo", extra: ["/usr/bin"]) {
+            let out = runner.run(lsappinfo, ["find", "bundleid=\(bundle)"], timeout: 10)
+            return out?.status == 0 && !(out?.output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+        }
         guard let pgrep = tool("pgrep", extra: ["/usr/bin"]) else { return false }
         return runner.run(pgrep, ["-f", check.pattern], timeout: 10)?.status == 0
     }
