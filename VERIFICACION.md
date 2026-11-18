@@ -198,3 +198,10 @@ Fecha local: 17 de noviembre de 2026. Mismo Mac.
 - **Lectura real en este Mac**: presión «Advertencia» (nivel 2) y 9 GB de intercambio. Apps que más memoria usan: Firefox 6,2 GB (20 procesos), ChatGPT 2,4 GB, Claude 1,7 GB, Google Chrome 1,1 GB. Hay 174 procesos del sistema que no se pueden inspeccionar sin privilegios; la app lo indica.
 - El menú «Analizar» aparece en la barra de menús con las carpetas que existen.
 - No verificado visualmente (pantalla bloqueada durante la prueba): el mapa, la nueva pestaña de memoria, las casillas de Archivos y los atajos de teclado. La app compila, se instala y arranca.
+- **Revisión visual con la pantalla bloqueada** (solo capturas; los clics no son posibles): se añadieron `ESPACIO_TAB` y `ESPACIO_VIEW` para abrir la app en una pestaña o en el mapa.
+  - **Mapa de Carpetas**: Library (158 MB, gris y con candado), Developer y Downloads proporcionales.
+  - **Memoria RAM**: presión «Advertencia» en naranja, 11,9 GB de intercambio y la lista de 12 apps con barras y número de procesos.
+  - **Archivos**: columna de casillas y carpeta contenedora.
+  - Sin verificar: la interacción (entrar en el mapa, marcar casillas, atajos de teclado).
+- **DotSlash**: la caché de 542 MB que antes era «de dueño desconocido» se reconoce como «Caché de DotSlash» (binarios descargados bajo demanda, por ejemplo por Codex). Pasa a bajo riesgo y exige Codex cerrado.
+- **Codex**: `install-agentes.sh` registró el MCP (`codex mcp list` → `gestor-espacio … enabled`) y copió la skill a `~/.codex/skills`. No se pudo probar con el modelo: la cuenta de Codex devuelve `402 deactivated_workspace`.

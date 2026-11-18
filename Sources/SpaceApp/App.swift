@@ -225,7 +225,8 @@ struct ContentView: View {
     @State private var selected = Set<String>()
     @State private var devChecked = Set<String>()
     @State private var acceptReview = false
-    @State private var tab = "Inicio"
+    // ESPACIO_TAB / ESPACIO_VIEW abren una pestaña o la vista de mapa al arrancar (pruebas visuales sin clics).
+    @State private var tab = ProcessInfo.processInfo.environment["ESPACIO_TAB"] ?? "Inicio"
     @State private var confirmEmpty = false
     private let accent = Color(red: 0.12, green: 0.58, blue: 0.48)
     var filtered: [FileEntry] {
@@ -361,7 +362,7 @@ struct ContentView: View {
             }
         }.accessibilityElement(children: .combine)
     }
-    @State private var folderView = "Lista"
+    @State private var folderView = ProcessInfo.processInfo.environment["ESPACIO_VIEW"] ?? "Lista"
     @State private var mapRoot: String?
 
     /// Mapa de áreas de un nivel; un clic en una carpeta con subcarpetas entra en ella.

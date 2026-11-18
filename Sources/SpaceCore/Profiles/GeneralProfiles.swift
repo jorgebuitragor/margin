@@ -13,7 +13,9 @@ extension DevProfiles {
         "Codex": ("Caché de Codex", ProcessCheck(label: "Codex", pattern: "Codex.app/Contents/MacOS/"), nil),
         "JetBrains": ("Caché de JetBrains", ProcessCheck(label: "los IDE de JetBrains", pattern: ".app/Contents/MacOS/idea"), nil),
         "Docker Desktop": ("Caché de Docker Desktop", ProcessCheck(label: "Docker Desktop", pattern: "Docker.app/Contents/MacOS/"), nil),
-        "CocoaPods": ("Caché de CocoaPods", nil, ["pod", "cache", "clean", "--all"])
+        "CocoaPods": ("Caché de CocoaPods", nil, ["pod", "cache", "clean", "--all"]),
+        // DotSlash descarga bajo demanda los binarios que piden algunas herramientas (por ejemplo, Codex).
+        "dotslash": ("Caché de DotSlash", ProcessCheck(label: "Codex", pattern: "Codex.app/Contents/MacOS/"), nil)
     ]
     /// Cachés que gestionan otros perfiles o el propio sistema.
     static let skippedCaches: Set<String> = ["Homebrew", "Yarn", "pnpm", "TemporaryItems", "CloudKit", "GeoServices", "PassKit", "GameKit", "FamilyCircle", "Animoji"]

@@ -12,7 +12,7 @@ El proyecto vive en `~/Developer/gestor-espacio-mac` (ver su `README.md` y `PLAN
 
 ## Regla que no se negocia
 
-**Tú nunca aplicas un plan.** No ejecutes `espacio apply` (tampoco con `echo … |`, `run_in_terminal` ni ningún otro medio), no borres, no muevas a la Papelera y no lances tú los comandos de limpieza (`pnpm store prune`, `brew cleanup`, `xcrun simctl delete`…). Tu trabajo termina al entregar el código del plan; Jorge lo aplica escribiéndolo en su terminal. `espacio apply` exige una terminal interactiva precisamente por esto. Lo mismo vale para **vaciar la Papelera** (`espacio vaciar-papelera` o el botón de la app): es la única acción de borrado definitivo y solo la hace Jorge; tú, como mucho, le recuerdas que lo movido a la Papelera no libera espacio hasta vaciarla.
+**Tú nunca aplicas un plan.** No ejecutes `espacio apply` (tampoco con `echo … |`, `run_in_terminal`, una terminal de Codex ni ningún otro medio), no borres, no muevas a la Papelera y no lances tú los comandos de limpieza (`pnpm store prune`, `brew cleanup`, `xcrun simctl delete`…). Tu trabajo termina al entregar el código del plan; Jorge lo aplica escribiéndolo en su terminal. `espacio apply` exige una terminal interactiva precisamente por esto. Lo mismo vale para **vaciar la Papelera** (`espacio vaciar-papelera` o el botón de la app): es la única acción de borrado definitivo y solo la hace Jorge; tú, como mucho, le recuerdas que lo movido a la Papelera no libera espacio hasta vaciarla.
 
 ## Flujo
 

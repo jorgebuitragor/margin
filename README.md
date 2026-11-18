@@ -46,9 +46,9 @@ La confirmación consiste en escribir el código del plan en una terminal intera
 bash scripts/install-agentes.sh   # skill ~/.claude/skills/liberar-espacio + MCP «gestor-espacio» (ámbito de usuario)
 ```
 
-El servidor MCP (`espacio mcp`, JSON-RPC por stdio) ofrece `disk_status`, `scan_folder`, `dev_report`, `propose_cleanup` y `plan_result`. **Ninguna herramienta ejecuta nada**: `propose_cleanup` guarda un plan y devuelve `espacio apply <plan>` para que lo apliques tú. La skill `liberar-espacio` guía a Claude Code: mide, presenta por categoría, pregunta qué incluir, crea el plan y, cuando lo hayas aplicado, revisa el resultado. Para Codex u otro cliente MCP, registra el comando `~/.local/bin/espacio mcp`.
+El servidor MCP (`espacio mcp`, JSON-RPC por stdio) ofrece `disk_status`, `scan_folder`, `dev_report`, `propose_cleanup` y `plan_result`. **Ninguna herramienta ejecuta nada**: `propose_cleanup` guarda un plan y devuelve `espacio apply <plan>` para que lo apliques tú. La skill `liberar-espacio` guía a Claude Code: mide, presenta por categoría, pregunta qué incluir, crea el plan y, cuando lo hayas aplicado, revisa el resultado. El mismo script registra el MCP y copia la skill en **Codex** (`codex mcp add`, `~/.codex/skills`) si está instalado; para otros clientes MCP, registra el comando `~/.local/bin/espacio mcp`.
 
-Deshacer la integración: `claude mcp remove --scope user gestor-espacio` y borrar `~/.claude/skills/liberar-espacio`.
+Deshacer la integración: `claude mcp remove --scope user gestor-espacio`, `codex mcp remove gestor-espacio` y borrar `~/.claude/skills/liberar-espacio` y `~/.codex/skills/liberar-espacio`.
 
 Al analizar la carpeta personal, macOS puede pedir permiso para acceder a datos de otras apps (por ejemplo `~/Library/Containers`). Si se deniega, esa carpeta se cuenta como ilegible y el total se marca como mínimo.
 

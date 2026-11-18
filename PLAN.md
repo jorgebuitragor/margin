@@ -110,7 +110,7 @@ También hecho el 2026-11-17:
 
 Pendiente:
 
-- Recorrido visual de lo anterior: la pantalla estaba bloqueada cuando se iba a hacer.
+- Interacción con lo anterior (clics en el mapa, marcar casillas, atajos de teclado): la pantalla estaba bloqueada. Ya se comprobó cómo se ven, con capturas abriendo la app en cada pestaña (`ESPACIO_TAB`, `ESPACIO_VIEW`).
 - Comprobación manual del selector de carpetas del sistema, que corre en otro proceso y no se puede automatizar.
 - Opcional: aviso cuando el disco baje de un umbral (LaunchAgent ligero). Solo si Jorge lo quiere.
 
