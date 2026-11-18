@@ -205,3 +205,22 @@ Fecha local: 17 de noviembre de 2026. Mismo Mac.
   - Sin verificar: la interacción (entrar en el mapa, marcar casillas, atajos de teclado).
 - **DotSlash**: la caché de 542 MB que antes era «de dueño desconocido» se reconoce como «Caché de DotSlash» (binarios descargados bajo demanda, por ejemplo por Codex). Pasa a bajo riesgo y exige Codex cerrado.
 - **Codex**: `install-agentes.sh` registró el MCP (`codex mcp list` → `gestor-espacio … enabled`) y copió la skill a `~/.codex/skills`. No se pudo probar con el modelo: la cuenta de Codex devuelve `402 deactivated_workspace`.
+
+## Pruebas de interacción de la 0.6 (18-11-2026, pantalla desbloqueada)
+
+Hechas con clics reales sobre una carpeta personal sintética de 52 MB (`ESPACIO_HOME` + `ESPACIO_SCAN`), sin ejecutar ningún plan.
+
+- **Mapa**: clic en Proyectos → app-web entra nivel a nivel y las áreas cuadran (23,5 MB = 16,5 + 7). «Subir» vuelve hasta la raíz y se desactiva allí. Las carpetas protegidas salen en gris con candado.
+- **Archivos**: las casillas marcan solo «Revisar antes de borrar»; las protegidas y «No determinado» no se marcan. «Mover a la Papelera (2)…» abre el plan con las rutas, y «Ejecutar» sigue desactivado hasta marcar «Entiendo…». Se canceló. La búsqueda filtra.
+- **Limpieza**: «Ver detalle» desde Inicio lleva a Limpieza. La casilla activa «Revisar plan (1)…» y el plan muestra el comando exacto (`brew cleanup --prune=all`). Se canceló.
+- **Menú «Analizar»**: lista solo las carpetas que existen; «Descargas» y «Análisis inteligente» funcionan.
+
+Fallos encontrados y corregidos:
+
+1. **Selección arrastrada entre análisis**: al analizar otra carpeta seguía la selección anterior («2 seleccionados» con el botón en 1), y un elemento que ya no se veía podía acabar en el plan. Ahora la selección se vacía con cada análisis nuevo (verificado: botón en 0).
+2. **Mapa sin salida**: entrar en una carpeta sin subcarpetas en el informe (por ejemplo, `node_modules` en el tercer nivel) mostraba una única pieza «Otros». Ahora solo se entra si hay subcarpetas. Para ver más detalle, el menú contextual ofrece «Analizar esta carpeta», y la ayuda emergente lo indica.
+3. **Filtro y selección**: el resumen avisa de los elementos marcados que el filtro oculta («2 seleccionados (1 oculto por el filtro)»), porque también irían al plan.
+4. **El menú no cambiaba de pestaña**: «Análisis inteligente» desde Memoria RAM no mostraba nada. Ahora lleva a Inicio (o se queda en Limpieza), y las carpetas llevan a Carpetas (o se quedan en Archivos).
+5. **Modo de prueba y comandos globales**: con la carpeta sintética, el perfil de Homebrew mostraba la caché real (41,1 MB), porque `brew` es de todo el Mac. Aplicar ese plan en modo de prueba habría ejecutado `brew cleanup` de verdad. Ahora, con una carpeta personal sintética, los comandos de las herramientas se bloquean (como ya pasaba con Vaciar Papelera). Lo cubre una prueba nueva: **57 pruebas, 0 fallos**.
+
+Sin cubrir: los atajos de teclado como pulsaciones reales (el control en segundo plano solo usa el menú, que ejecuta las mismas órdenes), el menú contextual (no se puede abrir en segundo plano) y el selector de carpetas del sistema.

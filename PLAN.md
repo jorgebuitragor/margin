@@ -108,9 +108,12 @@ También hecho el 2026-11-17:
 - **Memoria RAM**: presión real de macOS (`kern.memorystatus_vm_pressure_level`: Normal, Advertencia o Crítica) y las 12 apps que más memoria usan (huella física por app, sumando sus procesos auxiliares). Sin purgas ni cierres.
 - **Selección y atajos**: casillas en Archivos (además de ⌘/⇧ y clic), menú «Analizar» con carpetas frecuentes (⌘⇧H personal, ⌘⇧L Descargas, ⌘⇧D Escritorio, ⌘⇧P Developer), ⌘O para elegir carpeta y ⌘R para el análisis inteligente, y botones de atajo en el estado vacío de Carpetas.
 
+También hecho el 2026-11-18: pruebas de interacción con clics reales (mapa, casillas, plan, menú) y cinco correcciones, entre ellas la selección arrastrada entre análisis y el bloqueo de comandos globales en modo de prueba. Ver VERIFICACION.md.
+
 Pendiente:
 
-- Interacción con lo anterior (clics en el mapa, marcar casillas, atajos de teclado): la pantalla estaba bloqueada. Ya se comprobó cómo se ven, con capturas abriendo la app en cada pestaña (`ESPACIO_TAB`, `ESPACIO_VIEW`).
+- Probar a mano los atajos de teclado como pulsaciones y el menú contextual del mapa («Analizar esta carpeta»), que no se pueden automatizar en segundo plano.
+
 - Comprobación manual del selector de carpetas del sistema, que corre en otro proceso y no se puede automatizar.
 - Opcional: aviso cuando el disco baje de un umbral (LaunchAgent ligero). Solo si Jorge lo quiere.
 

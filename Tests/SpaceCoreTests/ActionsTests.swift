@@ -198,6 +198,18 @@ final class ActionsTests: XCTestCase {
         XCTAssertEqual(failed.results.first?.status, .failed)
     }
 
+    func testToolCommandsNeverRunForRealFromATestHome() throws {
+        // brew, docker o pnpm actúan sobre todo el Mac: con una carpeta personal sintética y el ejecutor real se bloquean.
+        let pnpm = try file("bin/pnpm", 0, "#!/bin/sh\ntouch \"$(dirname \"$0\")/ejecutado\"\n")
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: pnpm.path)
+        try file("Library/pnpm/store/v10/files/aa/blob", 2_000_000)
+        let env = env(FakeRunner(["pnpm store path": home.appendingPathComponent("Library/pnpm/store/v10").path]))
+        let store = try item(env, "Store de pnpm v10")
+        let report = try Planner.apply(try Planner.plan(devItems: [store], env: env), env: env, executor: SystemExecutor())
+        XCTAssertEqual(report.results.first?.status, .blocked)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: home.appendingPathComponent("bin/ejecutado").path))
+    }
+
     func testRealRunnerUsesToolsOwnNodeAndKeepsErrors() throws {
         // Simula una herramienta de nvm: un script que llama a «node» y un «node» hermano en la misma carpeta.
         let dir = home.appendingPathComponent(".nvm/versions/node/v24.0.0/bin")

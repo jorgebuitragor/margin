@@ -46,6 +46,9 @@ final class AppModel: ObservableObject {
     @Published var visited = 0
     @Published var message = "Elige una carpeta para empezar. El análisis no modifica tus archivos."
     @Published var diagnostics = Diagnostics.read()
+    /// Pestañas a las que lleva una orden del menú «Analizar», para que su resultado se vea (la primera es el destino
+    /// si la pestaña actual no es ninguna de ellas).
+    @Published var showTabs: [String]?
     private var cancellation: ScanCancellation?
     private var session = UUID()
 
@@ -207,12 +210,12 @@ struct SpaceApp: App {
             // Carpetas frecuentes sin pasar por el selector del sistema (también accesibles por teclado).
             CommandMenu("Analizar") {
                 ForEach(AppModel.quickFolders(), id: \.path) { item in
-                    Button(item.title) { model.scan(item.url) }
+                    Button(item.title) { model.scan(item.url); model.showTabs = ["Carpetas", "Archivos"] }
                         .keyboardShortcut(item.shortcut, modifiers: [.command, .shift])
                 }
                 Divider()
-                Button("Elegir carpeta…") { model.choose() }.keyboardShortcut("o", modifiers: .command)
-                Button("Análisis inteligente") { model.analyzeDev() }.keyboardShortcut("r", modifiers: .command)
+                Button("Elegir carpeta…") { model.choose(); if model.report != nil || model.busy { model.showTabs = ["Carpetas", "Archivos"] } }.keyboardShortcut("o", modifiers: .command)
+                Button("Análisis inteligente") { model.analyzeDev(); model.showTabs = ["Inicio", "Limpieza"] }.keyboardShortcut("r", modifiers: .command)
             }
         }
     }
@@ -237,6 +240,18 @@ struct ContentView: View {
     var chosen: FileEntry? { selected.count == 1 ? model.report?.entries.first { selected.contains($0.id) } : nil }
     var trashableSelection: [FileEntry] {
         (model.report?.entries ?? []).filter { selected.contains($0.id) && $0.classification.category == .review && $0.bytes != nil }
+    }
+    /// Resumen de la selección; avisa si hay elementos marcados que el filtro oculta (también irían al plan).
+    var selectionSummary: String {
+        let count = selected.count
+        guard count > 0 else { return "Marca las casillas (o usa ⌘/⇧ y clic) para elegir varios archivos «Revisar antes de borrar»." }
+        let visible = Set(filtered.map(\.id))
+        let hidden = selected.filter { !visible.contains($0) }.count
+        let movable = trashableSelection.count
+        var text = count == 1 ? "1 seleccionado" : "\(count) seleccionados"
+        if hidden > 0 { text += " (\(hidden == 1 ? "1 oculto" : "\(hidden) ocultos") por el filtro)" }
+        if movable < count { text += " · \(movable) \(movable == 1 ? "puede" : "pueden") ir a la Papelera: solo los «Revisar antes de borrar»" }
+        return text + "."
     }
     var body: some View {
         NavigationSplitView {
@@ -276,7 +291,13 @@ struct ContentView: View {
             }.padding(28)
         }
         .tint(accent)
-        .onChange(of: model.report?.root) { mapRoot = nil }
+        // Un análisis nuevo (u otra carpeta) invalida la navegación del mapa y la selección: los elementos marcados
+        // pertenecían al informe anterior y no deben ir a parar a un plan sin que se vean.
+        .onChange(of: model.report?.root) { mapRoot = nil; selected.removeAll() }
+        .onChange(of: model.showTabs) {
+            if let tabs = model.showTabs, let first = tabs.first, !tabs.contains(tab) { tab = first }
+            model.showTabs = nil
+        }
         .sheet(item: $model.pendingPlan) { plan in confirmation(plan) }
         .alert("¿Vaciar la Papelera?", isPresented: $confirmEmpty) {
             Button("Cancelar", role: .cancel) {}
@@ -386,7 +407,8 @@ struct ContentView: View {
                     ForEach(Array(items.enumerated()), id: \.element.id) { index, folder in
                         let rect = rects[index]
                         let isRest = folder.path.hasSuffix("/…")
-                        let canEnter = !isRest && !Treemap.children(of: folder.path, in: report).isEmpty
+                        // Solo se entra si hay subcarpetas en el informe; si no, el nivel sería una única pieza «Otros».
+                        let canEnter = !isRest && Treemap.children(of: folder.path, in: report).contains { !$0.path.hasSuffix("/…") }
                         let color: Color = isRest ? .gray : folder.protection == "sync" ? .blue : folder.protection == "protected" ? .secondary : accent
                         Button {
                             if canEnter { mapRoot = folder.path }
@@ -409,9 +431,12 @@ struct ContentView: View {
                         .buttonStyle(.plain)
                         .frame(width: max(rect.width - 2, 0), height: max(rect.height - 2, 0))
                         .offset(x: rect.minX + 1, y: rect.minY + 1)
-                        .help("\(isRest ? "Archivos sueltos y carpetas pequeñas" : folder.path) · \(size(folder.allocatedBytes))\(folder.reason.map { " · " + $0 } ?? "")")
+                        .help("\(isRest ? "Archivos sueltos y carpetas pequeñas" : folder.path) · \(size(folder.allocatedBytes))\(folder.reason.map { " · " + $0 } ?? "")\(!isRest && !canEnter && folder.protection == nil ? " · Este análisis no tiene más detalle: clic derecho › «Analizar esta carpeta»." : "")")
                         .contextMenu {
-                            if !isRest { Button("Mostrar en Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: folder.path)]) } }
+                            if !isRest {
+                                Button("Mostrar en Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: folder.path)]) }
+                                if folder.protection == nil { Button("Analizar esta carpeta") { model.scan(URL(fileURLWithPath: folder.path)) } }
+                            }
                         }
                         .accessibilityLabel("\(isRest ? "Otros" : folder.name), \(size(folder.allocatedBytes))\(folder.protection == "protected" ? ", protegida" : folder.protection == "sync" ? ", sincronizada" : "")\(canEnter ? ", se puede abrir" : "")")
                     }
@@ -665,7 +690,7 @@ struct ContentView: View {
                 if filtered.isEmpty { Text("No hay resultados para mostrar con estos filtros.").foregroundStyle(.secondary) }
             }
             HStack {
-                Text(selected.count > 1 ? "\(selected.count) seleccionados; solo los «Revisar antes de borrar» pueden ir a la Papelera." : "Marca las casillas (o usa ⌘/⇧ y clic) para elegir varios archivos «Revisar antes de borrar».").font(.caption).foregroundStyle(.secondary)
+                Text(selectionSummary).font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button("Mover a la Papelera (\(trashableSelection.count))…", systemImage: "trash") { model.prepare(files: trashableSelection) }
                     .disabled(trashableSelection.isEmpty || model.preparing || model.applying)

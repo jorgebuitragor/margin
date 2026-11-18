@@ -331,6 +331,11 @@ public enum Planner {
         guard let argv = step.action.argv, let name = argv.first, let exe = env.executable(for: name) else {
             return StepResult(stepID: step.id, title: step.title, status: .blocked, message: "Sin comando ejecutable.")
         }
+        // Los comandos de las herramientas (brew, docker, sdkmanager…) actúan sobre todo el Mac, no sobre la carpeta
+        // personal: con una carpeta sintética (modo de prueba) no se ejecutan de verdad.
+        if executor is SystemExecutor && DevEnvironment.canonical(env.home.path) != DevEnvironment.canonical(FileManager.default.homeDirectoryForCurrentUser.path) {
+            return StepResult(stepID: step.id, title: step.title, status: .blocked, message: "Modo de prueba: los comandos de las herramientas actúan sobre todo el Mac y no se ejecutan con una carpeta personal sintética.")
+        }
         guard let result = executor.run(exe, Array(argv.dropFirst())) else {
             return StepResult(stepID: step.id, title: step.title, status: .failed, message: "No se pudo ejecutar o superó el tiempo máximo.")
         }
