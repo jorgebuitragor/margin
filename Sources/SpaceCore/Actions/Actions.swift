@@ -104,12 +104,12 @@ public enum PlanError: LocalizedError {
     case wrongHome
     public var errorDescription: String? {
         switch self {
-        case .notEligible(let title): return "«\(title)» no se puede incluir en un plan (protegido, sin acción o no revisable)."
-        case .missing(let path): return "No existe o no es un archivo o carpeta normal: \(path)"
-        case .notFound(let id): return "No se encontró \(id)."
-        case .expired: return "El plan tiene más de 24 horas. Vuelve a crearlo para trabajar con datos actuales."
-        case .alreadyApplied: return "Este plan ya se aplicó. Crea uno nuevo."
-        case .wrongHome: return "El plan se creó para otra carpeta personal."
+        case .notEligible(let title): return loc("«\(title)» no se puede incluir en un plan (protegido, sin acción o no revisable).", "“\(title)” can't be included in a plan (protected, no action or not reviewable).")
+        case .missing(let path): return loc("No existe o no es un archivo o carpeta normal: \(path)", "Doesn't exist or isn't a regular file or folder: \(path)")
+        case .notFound(let id): return loc("No se encontró \(id).", "\(id) wasn't found.")
+        case .expired: return loc("El plan tiene más de 24 horas. Vuelve a crearlo para trabajar con datos actuales.", "The plan is more than 24 hours old. Create it again to work with current data.")
+        case .alreadyApplied: return loc("Este plan ya se aplicó. Crea uno nuevo.", "This plan was already applied. Create a new one.")
+        case .wrongHome: return loc("El plan se creó para otra carpeta personal.", "The plan was created for another home folder.")
         }
     }
 }
@@ -147,7 +147,7 @@ public enum PlanStore {
 
     public static func load(_ id: String, _ env: DevEnvironment) throws -> Plan {
         guard id.range(of: #"^[0-9a-f]{8}$"#, options: .regularExpression) != nil,
-              let data = FileManager.default.contents(atPath: "\(directory(env))/\(id).json") else { throw PlanError.notFound("el plan \(id)") }
+              let data = FileManager.default.contents(atPath: "\(directory(env))/\(id).json") else { throw PlanError.notFound(loc("el plan \(id)", "plan \(id)")) }
         return try decoder.decode(Plan.self, from: data)
     }
 
@@ -210,7 +210,7 @@ public enum Planner {
                                   source: .file, profile: nil, title: entry.name, category: .review, reason: entry.classification.reason, regenerate: entry.classification.consequence,
                                   action: .trash(entry.path), identities: [entry.path: identity], bytes: entry.allocatedBytes, recoverable: entry.allocatedBytes))
         }
-        guard !steps.isEmpty else { throw PlanError.notFound("ningún elemento para el plan") }
+        guard !steps.isEmpty else { throw PlanError.notFound(loc("ningún elemento para el plan", "no item for the plan")) }
         let id = String(format: "%08x", UInt32.random(in: 0...UInt32.max))
         return Plan(id: id, created: env.now, home: env.home.path, steps: steps, inactiveDays: env.inactiveDays, projectRoots: env.projectRoots.map(\.path))
     }
@@ -230,25 +230,25 @@ public enum Planner {
     public static func blocker(_ step: PlanStep, plan: Plan, env: DevEnvironment, freshProfiles: inout [String: ProfileResult]) -> String? {
         if env.now.timeIntervalSince(plan.created) > maxAge { return PlanError.expired.localizedDescription }
         if plan.home != env.home.path { return PlanError.wrongHome.localizedDescription }
-        for check in step.action.requiresClosed where env.isRunning(check) { return "Cierra \(check.label) antes de continuar." }
+        for check in step.action.requiresClosed where env.isRunning(check) { return loc("Cierra \(check.label) antes de continuar.", "Quit \(check.label) before continuing.") }
         switch step.source {
         case .profile:
-            guard let profileID = step.profile else { return "Paso sin perfil." }
+            guard let profileID = step.profile else { return loc("Paso sin perfil.", "Step without a profile.") }
             if freshProfiles[profileID] == nil { freshProfiles[profileID] = DevProfiles.profile(profileID, env) }
             guard let fresh = freshProfiles[profileID]?.items.first(where: { $0.id == step.id }) else {
-                return "Ya no aparece en el análisis actual (puede que ya se haya limpiado)."
+                return loc("Ya no aparece en el análisis actual (puede que ya se haya limpiado).", "It no longer shows up in the current scan (it may already have been cleaned).")
             }
             guard fresh.canDelete, fresh.category == step.category else {
-                return "Cambió de categoría (ahora: \(fresh.category.rawValue)). Vuelve a crear el plan."
+                return loc("Cambió de categoría (ahora: \(fresh.category.rawValue)). Vuelve a crear el plan.", "Its category changed (now: \(fresh.category.rawValue)). Create the plan again.")
             }
-            guard fresh.action == step.action else { return "La acción propuesta cambió. Vuelve a crear el plan." }
+            guard fresh.action == step.action else { return loc("La acción propuesta cambió. Vuelve a crear el plan.", "The suggested action changed. Create the plan again.") }
         case .file:
             for path in step.action.paths {
                 let url = URL(fileURLWithPath: path)
-                if Classifier.classify(url).category != .review { return "Ya no se clasifica como archivo revisable." }
+                if Classifier.classify(url).category != .review { return loc("Ya no se clasifica como archivo revisable.", "It's no longer classified as a reviewable file.") }
                 if let reason = Classifier.protectedReason(url) { return reason }
                 if let sync = SyncDetector.provider(forDirectoryOrAncestors: url.deletingLastPathComponent()) {
-                    return "Está en una carpeta sincronizada con \(sync.provider)."
+                    return loc("Está en una carpeta sincronizada con \(sync.provider).", "It's in a folder synced with \(sync.provider).")
                 }
             }
         }
@@ -256,27 +256,27 @@ public enum Planner {
             for path in step.action.paths {
                 if let problem = pathProblem(path, env: env) { return problem }
                 guard let now = FileIdentity.of(path), let planned = step.identities[path], now.sameObject(as: planned) else {
-                    return "Cambió desde que se planificó: \(path)"
+                    return loc("Cambió desde que se planificó: \(path)", "Changed since it was planned: \(path)")
                 }
             }
         }
         if step.action.kind == .command {
-            guard let name = step.action.argv?.first, env.executable(for: name) != nil else { return "No se encontró la herramienta \(step.action.argv?.first ?? "?")." }
+            guard let name = step.action.argv?.first, env.executable(for: name) != nil else { return loc("No se encontró la herramienta \(step.action.argv?.first ?? "?").", "The tool \(step.action.argv?.first ?? "?") wasn't found.") }
         }
-        if step.action.kind == .manual { return "Esta acción solo se puede hacer a mano." }
+        if step.action.kind == .manual { return loc("Esta acción solo se puede hacer a mano.", "This action can only be done by hand.") }
         return nil
     }
 
     /// Reglas de seguridad independientes de los perfiles para cualquier ruta que se mueva a la Papelera.
     static func pathProblem(_ path: String, env: DevEnvironment) -> String? {
         let home = env.home.path
-        guard path.hasPrefix(home + "/") else { return "Fuera de tu carpeta personal: \(path)" }
+        guard path.hasPrefix(home + "/") else { return loc("Fuera de tu carpeta personal: \(path)", "Outside your home folder: \(path)") }
         let below = path.dropFirst(home.count + 1).split(separator: "/")
-        guard below.count >= 2, !below.contains("..") else { return "Ruta demasiado general para retirarla: \(path)" }
+        guard below.count >= 2, !below.contains("..") else { return loc("Ruta demasiado general para retirarla: \(path)", "Path too general to remove: \(path)") }
         // Ningún componente puede ser un enlace: realpath debe coincidir con la ruta pedida.
-        guard let real = realpath(path, nil) else { return "No existe: \(path)" }
+        guard let real = realpath(path, nil) else { return loc("No existe: \(path)", "Doesn't exist: \(path)") }
         defer { free(real) }
-        guard String(cString: real) == path else { return "La ruta pasa por un enlace simbólico: \(path)" }
+        guard String(cString: real) == path else { return loc("La ruta pasa por un enlace simbólico: \(path)", "The path goes through a symbolic link: \(path)") }
         return nil
     }
 
@@ -312,7 +312,7 @@ public enum Planner {
         for path in step.action.paths {
             // Última comprobación inmediatamente antes de mover.
             guard let now = FileIdentity.of(path), let planned = step.identities[path], now.sameObject(as: planned) else {
-                result.failures[path] = "Cambió justo antes de moverlo; no se tocó."
+                result.failures[path] = loc("Cambió justo antes de moverlo; no se tocó.", "Changed right before moving it; it wasn't touched.")
                 continue
             }
             do {
@@ -323,24 +323,24 @@ public enum Planner {
             }
         }
         let status: StepResult.Status = result.failures.isEmpty ? .done : result.trashed.isEmpty ? .failed : .partial
-        let message = status == .done ? "Movido a la Papelera (\(result.trashed.count))." : "\(result.trashed.count) movidos, \(result.failures.count) con error."
+        let message = status == .done ? loc("Movido a la Papelera (\(result.trashed.count)).", "Moved to the Trash (\(result.trashed.count)).") : loc("\(result.trashed.count) movidos, \(result.failures.count) con error.", "\(result.trashed.count) moved, \(result.failures.count) with errors.")
         return StepResult(stepID: step.id, title: step.title, status: status, message: message, trashed: result.trashed, failures: result.failures)
     }
 
     static func command(_ step: PlanStep, env: DevEnvironment, executor: ActionExecutor) -> StepResult {
         guard let argv = step.action.argv, let name = argv.first, let exe = env.executable(for: name) else {
-            return StepResult(stepID: step.id, title: step.title, status: .blocked, message: "Sin comando ejecutable.")
+            return StepResult(stepID: step.id, title: step.title, status: .blocked, message: loc("Sin comando ejecutable.", "No executable command."))
         }
         // Los comandos de las herramientas (brew, docker, sdkmanager…) actúan sobre todo el Mac, no sobre la carpeta
         // personal: con una carpeta sintética (modo de prueba) no se ejecutan de verdad.
         if executor is SystemExecutor && DevEnvironment.canonical(env.home.path) != DevEnvironment.canonical(FileManager.default.homeDirectoryForCurrentUser.path) {
-            return StepResult(stepID: step.id, title: step.title, status: .blocked, message: "Modo de prueba: los comandos de las herramientas actúan sobre todo el Mac y no se ejecutan con una carpeta personal sintética.")
+            return StepResult(stepID: step.id, title: step.title, status: .blocked, message: loc("Modo de prueba: los comandos de las herramientas actúan sobre todo el Mac y no se ejecutan con una carpeta personal sintética.", "Test mode: tool commands act on the whole Mac and don't run with a synthetic home folder."))
         }
         guard let result = executor.run(exe, Array(argv.dropFirst())) else {
-            return StepResult(stepID: step.id, title: step.title, status: .failed, message: "No se pudo ejecutar o superó el tiempo máximo.")
+            return StepResult(stepID: step.id, title: step.title, status: .failed, message: loc("No se pudo ejecutar o superó el tiempo máximo.", "Couldn't run it or it exceeded the time limit."))
         }
         return StepResult(stepID: step.id, title: step.title, status: result.status == 0 ? .done : .failed,
-                          message: result.status == 0 ? "Comando terminado." : "El comando terminó con código \(result.status).",
+                          message: result.status == 0 ? loc("Comando terminado.", "Command finished.") : loc("El comando terminó con código \(result.status).", "The command ended with code \(result.status)."),
                           output: tail([result.output, result.error].filter { !$0.isEmpty }.joined(separator: "\n")))
     }
 

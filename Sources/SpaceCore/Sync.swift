@@ -18,7 +18,7 @@ public enum SyncDetector {
             switch parts[index + 1] {
             case "CloudStorage":
                 if index + 2 < parts.count { return providerName(fromCloudStorage: parts[index + 2]) }
-                return "Proveedor de archivos (CloudStorage)"
+                return loc("Proveedor de archivos (CloudStorage)", "File provider (CloudStorage)")
             case "Mobile Documents": return "iCloud Drive"
             default: break
             }
@@ -46,6 +46,6 @@ public enum SyncDetector {
     static func providerName(fromCloudStorage folder: String) -> String {
         let known = ["GoogleDrive": "Google Drive", "OneDrive": "OneDrive", "Dropbox": "Dropbox", "Box": "Box"]
         for (prefix, name) in known where folder.hasPrefix(prefix) { return name }
-        return "Proveedor de archivos (\(folder))"
+        return loc("Proveedor de archivos (\(folder))", "File provider (\(folder))")
     }
 }

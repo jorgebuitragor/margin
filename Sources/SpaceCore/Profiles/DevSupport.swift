@@ -235,7 +235,7 @@ extension DevItem {
     /// Crea un elemento midiendo su ruta.
     static func measured(_ profile: String, _ title: String, path: String, category: Category, reason: String, regenerate: String, action: DevAction?, lastUsed: Date? = nil, usage: Usage? = nil) -> DevItem {
         let u = usage ?? DiskUsage.measure(path)
-        let partialNote = u.partial ? " Hubo elementos ilegibles: el tamaño es un mínimo." : ""
+        let partialNote = u.partial ? loc(" Hubo elementos ilegibles: el tamaño es un mínimo.", " Some items were unreadable: the size is a minimum.") : ""
         return DevItem(profile: profile, title: title, path: path, bytes: u.allocated, recoverable: u.exclusive, category: category, reason: reason + partialNote, regenerate: regenerate, action: action, lastUsed: lastUsed ?? u.newest)
     }
 }

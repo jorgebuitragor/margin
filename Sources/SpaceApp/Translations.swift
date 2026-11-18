@@ -199,7 +199,7 @@ let english: [String: String] = [
     "Claro": "Light",
     "Oscuro": "Dark",
     "Idioma": "Language",
-    "Cambia la interfaz al momento. Las explicaciones detalladas de cada elemento (por qué se propone, qué pasa si se retira) por ahora están en español.": "Changes the interface right away. Detailed explanations for each item (why it's suggested, what happens if removed) are in Spanish for now.",
+    "Cambia la interfaz al momento y vuelve a hacer el análisis inteligente para traducir sus explicaciones. Los análisis de carpetas se traducen al repetirlos. La terminal y los agentes siguen en español.": "Changes the interface right away and reruns the smart scan so its explanations are translated too. Folder scans are translated when you run them again. The terminal and agents stay in Spanish.",
     "Colores aptos para daltonismo": "Colour-blind friendly colours",
     "Más contraste en bordes y fondos": "More contrast in borders and backgrounds",
     "Reducir movimiento": "Reduce motion",

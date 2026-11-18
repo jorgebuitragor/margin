@@ -80,7 +80,7 @@ public enum ScanError: LocalizedError {
     case invalidRoot, protectedRoot(String)
     public var errorDescription: String? {
         switch self {
-        case .invalidRoot: return "Selecciona una carpeta local válida, sin enlaces ni alias."
+        case .invalidRoot: return loc("Selecciona una carpeta local válida, sin enlaces ni alias.", "Choose a valid local folder, without links or aliases.")
         case .protectedRoot(let reason): return reason
         }
     }
@@ -93,7 +93,7 @@ public enum Scanner {
 
     public static func scan(root input: URL, options: ScanOptions, cancellation: ScanCancellation = ScanCancellation(), progress: @Sendable (Int) -> Void = { _ in }) throws -> ScanReport {
         let root = input.standardizedFileURL
-        guard root.path != "/" else { throw ScanError.protectedRoot("Elige una carpeta de usuario, no la raíz del sistema.") }
+        guard root.path != "/" else { throw ScanError.protectedRoot(loc("Elige una carpeta de usuario, no la raíz del sistema.", "Choose a user folder, not the system root.")) }
         let rootValues = try root.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey, .isAliasFileKey, .isPackageKey])
         guard rootValues.isDirectory == true, rootValues.isSymbolicLink != true, rootValues.isAliasFile != true else { throw ScanError.invalidRoot }
         if let reason = Classifier.protectedReason(root.resolvingSymlinksInPath(), isPackage: rootValues.isPackage == true) {
@@ -209,7 +209,7 @@ struct Walker {
         let url = URL(fileURLWithPath: path, isDirectory: true)
         var protection: Protection?
         if let reason = Classifier.protectedReason(url, isPackage: isPackage(url)) {
-            protection = Protection(kind: "protected", classification: Classification(category: .protected, reason: reason, consequence: "Eliminarlo podría impedir funcionamiento o recuperación de datos.", rule: "protected"))
+            protection = Protection(kind: "protected", classification: Classification(category: .protected, reason: reason, consequence: loc("Eliminarlo podría impedir funcionamiento o recuperación de datos.", "Removing it could break something or prevent data recovery."), rule: "protected"))
         } else if let provider = SyncDetector.provider(forDirectory: url) {
             protection = Protection(kind: "sync", classification: Classifier.synced(provider))
         }

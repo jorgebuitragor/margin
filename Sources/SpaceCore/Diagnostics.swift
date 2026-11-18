@@ -41,22 +41,22 @@ public struct Diagnostics: Codable, Sendable {
         var pageSize: vm_size_t = 0
         let pageResult = host_page_size(host, &pageSize)
         let valid = result == KERN_SUCCESS && pageResult == KERN_SUCCESS
-        if !valid { errors.append("Estadísticas de memoria no disponibles (\(result)).") }
+        if !valid { errors.append(loc("Estadísticas de memoria no disponibles (\(result)).", "Memory statistics not available (\(result)).")) }
         var swap = xsw_usage()
         var swapSize = MemoryLayout<xsw_usage>.size
         let swapResult = sysctlbyname("vm.swapusage", &swap, &swapSize, nil, 0)
-        if swapResult != 0 { errors.append("Intercambio no disponible.") }
+        if swapResult != 0 { errors.append(loc("Intercambio no disponible.", "Swap not available.")) }
         var total: Int64?
         var available: Int64?
         do {
             let values = try FileManager.default.homeDirectoryForCurrentUser.resourceValues(forKeys: [.volumeTotalCapacityKey, .volumeAvailableCapacityKey])
             total = values.volumeTotalCapacity.map(Int64.init)
             available = values.volumeAvailableCapacity.map(Int64.init)
-        } catch { errors.append("Capacidad del volumen no disponible: \(error.localizedDescription)") }
+        } catch { errors.append(loc("Capacidad del volumen no disponible: \(error.localizedDescription)", "Volume capacity not available: \(error.localizedDescription)")) }
         var level: Int32 = 0
         var levelSize = MemoryLayout<Int32>.size
         let pressureLevel = sysctlbyname("kern.memorystatus_vm_pressure_level", &level, &levelSize, nil, 0) == 0 ? Int(level) : nil
-        if pressureLevel == nil { errors.append("Presión de memoria no disponible.") }
+        if pressureLevel == nil { errors.append(loc("Presión de memoria no disponible.", "Memory pressure not available.")) }
         let (apps, hidden) = AppMemory.top(limit: 12)
         var diagnostics = Diagnostics(date: Date(), physicalMemory: ProcessInfo.processInfo.physicalMemory,
                            wiredMemory: valid ? UInt64(vm.wire_count) * UInt64(pageSize) : nil,

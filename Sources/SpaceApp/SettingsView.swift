@@ -81,7 +81,7 @@ struct SettingsPane: View {
             } header: {
                 Text(t("Idioma"))
             } footer: {
-                Text(t("Cambia la interfaz al momento. Las explicaciones detalladas de cada elemento (por qué se propone, qué pasa si se retira) por ahora están en español."))
+                Text(t("Cambia la interfaz al momento y vuelve a hacer el análisis inteligente para traducir sus explicaciones. Los análisis de carpetas se traducen al repetirlos. La terminal y los agentes siguen en español."))
             }
             Section {
                 Toggle(t("Colores aptos para daltonismo"), isOn: $colorblind)

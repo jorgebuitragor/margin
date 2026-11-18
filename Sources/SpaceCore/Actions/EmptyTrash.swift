@@ -25,7 +25,7 @@ public enum TrashEmptier {
     public static func empty(env: DevEnvironment, executor: ActionExecutor = SystemExecutor()) -> Result {
         // Finder solo conoce la Papelera real: con una carpeta personal de prueba (MARGIN_HOME) nunca se vacía.
         if executor is SystemExecutor && DevEnvironment.canonical(env.home.path) != DevEnvironment.canonical(FileManager.default.homeDirectoryForCurrentUser.path) {
-            return Result(date: Date(), status: .blocked, message: "Modo de prueba: la Papelera real no se vacía con una carpeta personal sintética.", availableBefore: nil, availableAfter: nil, output: nil)
+            return Result(date: Date(), status: .blocked, message: loc("Modo de prueba: la Papelera real no se vacía con una carpeta personal sintética.", "Test mode: the real Trash isn't emptied with a synthetic home folder."), availableBefore: nil, availableAfter: nil, output: nil)
         }
         let before = Planner.available(env)
         let run = executor.run(argv[0], Array(argv.dropFirst()))
@@ -35,16 +35,16 @@ public enum TrashEmptier {
         switch run?.status {
         case 0?:
             status = .done
-            message = "Papelera vaciada."
+            message = loc("Papelera vaciada.", "Trash emptied.")
         case nil:
             status = .failed
-            message = "No se pudo pedir a Finder que vacíe la Papelera (o tardó demasiado)."
+            message = loc("No se pudo pedir a Finder que vacíe la Papelera (o tardó demasiado).", "Couldn't ask Finder to empty the Trash (or it took too long).")
         default:
             status = .failed
             let detail = [run?.output, run?.error].compactMap { $0 }.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
             message = detail.contains("-1743") || detail.lowercased().contains("not authorized")
-                ? "macOS no dio permiso para controlar Finder. Actívalo en Ajustes del Sistema › Privacidad y seguridad › Automatización."
-                : "Finder no pudo vaciar la Papelera (¿elementos bloqueados o en uso?)."
+                ? loc("macOS no dio permiso para controlar Finder. Actívalo en Ajustes del Sistema › Privacidad y seguridad › Automatización.", "macOS didn't allow controlling Finder. Turn it on in System Settings › Privacy & Security › Automation.")
+                : loc("Finder no pudo vaciar la Papelera (¿elementos bloqueados o en uso?).", "Finder couldn't empty the Trash (locked or in-use items?).")
         }
         let output = [run?.output ?? "", run?.error ?? ""].filter { !$0.isEmpty }.joined(separator: "\n")
         let result = Result(date: Date(), status: status, message: message, availableBefore: before, availableAfter: after, output: output.isEmpty ? nil : Planner.tail(output))

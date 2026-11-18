@@ -8,7 +8,10 @@ struct MarginApp: App {
     @AppStorage(Pref.language) private var language = "sistema"
     @AppStorage(Pref.theme) private var theme = "sistema"
 
-    init() { Preferences.register() }
+    init() {
+        Preferences.register()
+        CoreText.isEnglish = Localizer.isEnglish
+    }
 
     var body: some Scene {
         WindowGroup("Margin") {
@@ -31,6 +34,12 @@ struct MarginApp: App {
                     }
                 }
                 .onChange(of: theme) { Preferences.applyTheme(theme) }
+                .onChange(of: language) {
+                    // Las explicaciones del análisis se generan en el idioma elegido: se rehace el análisis inteligente
+                    // (unos 8 s) para que también cambien. Los análisis de carpetas se traducen al repetirlos.
+                    CoreText.isEnglish = Localizer.isEnglish
+                    if model.dev != nil, !model.devBusy { model.analyzeDev() }
+                }
         }
         .defaultSize(width: 1180, height: 780)
         .commands {

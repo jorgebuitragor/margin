@@ -1,21 +1,28 @@
 import Foundation
 
 /// Proceso que debe estar cerrado antes de actuar (se comprueba con `pgrep -f patrón`).
+/// Dos comprobaciones son iguales si buscan el mismo proceso: el nombre visible depende del idioma.
 public struct ProcessCheck: Codable, Sendable, Equatable {
+    public static func == (a: ProcessCheck, b: ProcessCheck) -> Bool { a.pattern == b.pattern && a.bundleID == b.bundleID }
     public let label: String
     public let pattern: String
     /// Si se indica, se comprueba la app por su identificador (`lsappinfo find bundleid=…`) en lugar de `pgrep`.
     public var bundleID: String? = nil
     public static let xcode = ProcessCheck(label: "Xcode", pattern: "Xcode.app/Contents/MacOS/Xcode")
     public static let simulator = ProcessCheck(label: "Simulator", pattern: "Simulator.app/Contents/MacOS/Simulator")
-    public static let emulator = ProcessCheck(label: "el emulador de Android", pattern: "qemu-system-")
-    public static let gradle = ProcessCheck(label: "los daemons de Gradle (gradle --stop)", pattern: "GradleDaemon")
+    public static var emulator: ProcessCheck { ProcessCheck(label: loc("el emulador de Android", "the Android emulator"), pattern: "qemu-system-") }
+    public static var gradle: ProcessCheck { ProcessCheck(label: loc("los daemons de Gradle (gradle --stop)", "the Gradle daemons (gradle --stop)"), pattern: "GradleDaemon") }
     public static let claude = ProcessCheck(label: "Claude", pattern: "Claude.app/Contents/MacOS/Claude")
     public static let vscode = ProcessCheck(label: "VS Code", pattern: "Visual Studio Code.app/Contents/MacOS/")
 }
 
 /// Acción propuesta para un elemento. Se ejecuta solo mediante un plan confirmado por el usuario (ver Actions/).
+/// Al revalidar un plan se compara lo que se ejecutaría (tipo, argumentos, rutas y procesos), no los textos, que
+/// dependen del idioma: un plan creado en inglés en la app se puede aplicar desde la terminal en español.
 public struct DevAction: Codable, Sendable, Equatable {
+    public static func == (a: DevAction, b: DevAction) -> Bool {
+        a.kind == b.kind && a.argv == b.argv && a.previewArgv == b.previewArgv && a.paths == b.paths && a.requiresClosed == b.requiresClosed
+    }
     public enum Kind: String, Codable, Sendable {
         /// Comando oficial de la herramienta dueña.
         case command
@@ -46,7 +53,7 @@ public struct DevAction: Codable, Sendable, Equatable {
         trash([path], label: path, note: note, closed: closed)
     }
     public static func trash(_ paths: [String], label: String, note: String? = nil, closed: [ProcessCheck] = []) -> DevAction {
-        DevAction(kind: .trash, command: "Mover a la Papelera: \(label)", preview: nil, note: note, argv: nil, previewArgv: nil, paths: paths, requiresClosed: closed)
+        DevAction(kind: .trash, command: loc("Mover a la Papelera: \(label)", "Move to the Trash: \(label)"), preview: nil, note: note, argv: nil, previewArgv: nil, paths: paths, requiresClosed: closed)
     }
 
     static func display(_ argv: [String]) -> String {
@@ -56,7 +63,8 @@ public struct DevAction: Codable, Sendable, Equatable {
 }
 
 public struct DevItem: Codable, Sendable, Identifiable {
-    public var id: String { "\(profile):\(path ?? title)" }
+    /// Estable entre idiomas: la ruta o, si no hay, una clave fija (el título se traduce).
+    public var id: String { "\(profile):\(path ?? key ?? title)" }
     /// Identificador corto y estable (FNV-1a de `id`) para la CLI.
     public var shortID: String {
         var hash: UInt32 = 2_166_136_261
@@ -78,10 +86,13 @@ public struct DevItem: Codable, Sendable, Identifiable {
     public let regenerate: String
     public let action: DevAction?
     public let lastUsed: Date?
+    /// Clave fija para elementos sin ruta (por ejemplo, «Images» de Docker).
+    public var key: String? = nil
     /// Se puede incluir en un plan: tiene acción ejecutable y no está protegido. La ejecución exige confirmación.
     public var canDelete: Bool { category != .protected && category != .unknown && action.map { $0.kind != .manual } == true }
 
-    public init(profile: String, title: String, path: String?, bytes: Int64?, recoverable: Int64?, category: Category, reason: String, regenerate: String, action: DevAction?, lastUsed: Date? = nil) {
+    public init(profile: String, title: String, path: String?, bytes: Int64?, recoverable: Int64?, category: Category, reason: String, regenerate: String, action: DevAction?, lastUsed: Date? = nil, key: String? = nil) {
+        self.key = key
         self.profile = profile
         self.title = title
         self.path = path

@@ -54,18 +54,18 @@ public struct ProjectIndex: Sendable {
 
         if has("package.json") {
             let (cmd, pnpm) = has("pnpm-lock.yaml") ? ("pnpm install", true) : has("yarn.lock") ? ("yarn install", false) : has("bun.lockb") || has("bun.lock") ? ("bun install", false) : ("npm install", false)
-            artifact("node_modules", "Dependencias de Node", "Se reinstala con `\(cmd)` (descarga de red).", shared: pnpm)
-            if names.contains(where: { $0.hasPrefix("next.config.") }) { artifact(".next", "Compilación de Next.js", "Se regenera al compilar o arrancar Next.js.") }
-            artifact(".turbo", "Caché de Turborepo", "Se regenera en la siguiente ejecución de turbo.")
-            artifact(".expo", "Caché local de Expo", "Expo la regenera al arrancar.")
+            artifact("node_modules", loc("Dependencias de Node", "Node dependencies"), loc("Se reinstala con `\(cmd)` (descarga de red).", "Reinstalled with `\(cmd)` (network download)."), shared: pnpm)
+            if names.contains(where: { $0.hasPrefix("next.config.") }) { artifact(".next", loc("Compilación de Next.js", "Next.js build"), loc("Se regenera al compilar o arrancar Next.js.", "Regenerated when building or starting Next.js.")) }
+            artifact(".turbo", loc("Caché de Turborepo", "Turborepo cache"), loc("Se regenera en la siguiente ejecución de turbo.", "Regenerated on the next turbo run."))
+            artifact(".expo", loc("Caché local de Expo", "Local Expo cache"), loc("Expo la regenera al arrancar.", "Expo regenerates it on start."))
             readReactNativeVersions(dir)
         }
-        if has("Package.swift") { artifact(".build", "Compilación de SwiftPM", "Se regenera con `swift build`.") }
+        if has("Package.swift") { artifact(".build", loc("Compilación de SwiftPM", "SwiftPM build"), loc("Se regenera con `swift build`.", "Regenerated with `swift build`.")) }
         let gradleProject = has("build.gradle") || has("build.gradle.kts") || has("settings.gradle") || has("settings.gradle.kts")
         if gradleProject {
-            artifact("build", "Compilación de Gradle", "Se regenera al compilar con Gradle.")
-            artifact(".gradle", "Caché de Gradle del proyecto", "Gradle la regenera al compilar.")
-            artifact(".cxx", "Compilación nativa (CMake/NDK)", "Se regenera al compilar código nativo.")
+            artifact("build", loc("Compilación de Gradle", "Gradle build"), loc("Se regenera al compilar con Gradle.", "Regenerated when building with Gradle."))
+            artifact(".gradle", loc("Caché de Gradle del proyecto", "Project Gradle cache"), loc("Gradle la regenera al compilar.", "Gradle regenerates it when building."))
+            artifact(".cxx", loc("Compilación nativa (CMake/NDK)", "Native build (CMake/NDK)"), loc("Se regenera al compilar código nativo.", "Regenerated when building native code."))
             for file in ["build.gradle", "build.gradle.kts", "gradle.properties", "app/build.gradle", "app/build.gradle.kts"] {
                 if let text = env.read("\(dir)/\(file)") { readAndroidVersions(text, project: project) }
             }
@@ -76,9 +76,9 @@ public struct ProjectIndex: Sendable {
             let version = text.replacingOccurrences(of: "gradle-", with: "").replacingOccurrences(of: #"-(bin|all)\.zip"#, with: "", options: .regularExpression)
             gradleVersions[version, default: []].append(project)
         }
-        if has("Cargo.toml") { artifact("target", "Compilación de Rust", "Se regenera con `cargo build`.") }
-        else if has("pom.xml") { artifact("target", "Compilación de Maven", "Se regenera con `mvn package`.") }
-        if has("Podfile") { artifact("Pods", "Dependencias de CocoaPods", "Se reinstala con `pod install` (descarga de red).") }
+        if has("Cargo.toml") { artifact("target", loc("Compilación de Rust", "Rust build"), loc("Se regenera con `cargo build`.", "Regenerated with `cargo build`.")) }
+        else if has("pom.xml") { artifact("target", loc("Compilación de Maven", "Maven build"), loc("Se regenera con `mvn package`.", "Regenerated with `mvn package`.")) }
+        if has("Podfile") { artifact("Pods", loc("Dependencias de CocoaPods", "CocoaPods dependencies"), loc("Se reinstala con `pod install` (descarga de red).", "Reinstalled with `pod install` (network download).")) }
 
         for name in names.sorted() where !Self.skip.contains(name) && !name.hasPrefix(".") {
             let child = "\(dir)/\(name)"
