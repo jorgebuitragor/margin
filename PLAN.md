@@ -149,6 +149,7 @@ Pendiente después de la 0.9:
 - ~~Firma estable~~ ✅ hecha el 2026-11-18: la app se firma con la identidad local «Margin Local» (`scripts/firma-local.sh`) en vez de ad hoc, así que macOS conserva sus permisos entre versiones.
 - ✅ 2026-11-18: «Marcar todos» en restos de apps borradas; «Vaciar Papelera» siempre a mano (tarjeta sin análisis, menú con ⇧⌘⌫, botón tras un plan) con una confirmación propia en la que Retorno cancela.
 - ✅ 2026-11-18, **decisión de Jorge**: borrado definitivo opcional. Cambia la regla «no hay borrado permanente» de la 0.4: ahora es un ajuste de la app, apagado por defecto, con confirmación al activarlo y el riesgo siempre a la vista. Solo afecta a los planes de la app; la CLI y el MCP siguen usando la Papelera, y las apps de /Applications también.
+- ✅ 2026-11-18: README de presentación con capturas en claro y oscuro (`docs/capturas/`), hechas sobre una carpeta personal ficticia (`scripts/demo-home.sh`). La documentación técnica que tenía el README pasó a `docs/REFERENCIA.md`. Margin no está en GitHub: publicarla (pública o privada, y con qué licencia) es decisión de Jorge.
 
 ## Decisiones que necesita Jorge
 

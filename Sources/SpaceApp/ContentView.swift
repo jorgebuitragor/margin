@@ -104,7 +104,8 @@ struct ContentView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
-                if let home = DevEnvironment.testSetting("HOME") {
+                // MARGIN_CAPTURAS oculta la etiqueta solo para las capturas del README (scripts/demo-home.sh).
+                if let home = DevEnvironment.testSetting("HOME"), DevEnvironment.testSetting("CAPTURAS") == nil {
                     // Carpeta personal sintética: la barra del disco y los análisis solo ven esa carpeta.
                     Label(t("Modo de prueba"), systemImage: "testtube.2")
                         .font(.caption.weight(.semibold)).foregroundStyle(palette.warning)
@@ -366,6 +367,9 @@ struct ContentView: View {
         .accessibilityElement(children: .contain)
     }
 }
+
+/// Carpeta personal que se muestra como «~»: la de prueba si hay MARGIN_HOME, para no enseñar rutas reales.
+let displayHome = DevEnvironment.testSetting("HOME") ?? NSHomeDirectory()
 
 /// Marca de Margin: una barra de disco con un margen libre a la derecha.
 struct BrandMark: View {

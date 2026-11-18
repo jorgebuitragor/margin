@@ -53,7 +53,7 @@ struct SettingsPane: View {
                     ForEach(roots, id: \.self) { root in
                         HStack {
                             Image(systemName: FileManager.default.fileExists(atPath: root) ? "folder" : "folder.badge.questionmark").foregroundStyle(.secondary)
-                            Text(root.replacingOccurrences(of: NSHomeDirectory(), with: "~")).font(.callout).lineLimit(1).truncationMode(.middle)
+                            Text(root.replacingOccurrences(of: displayHome, with: "~")).font(.callout).lineLimit(1).truncationMode(.middle)
                             Spacer()
                             Button(t("Quitar"), systemImage: "minus.circle") { setRoots(roots.filter { $0 != root }) }
                                 .labelStyle(.iconOnly).buttonStyle(.borderless)
@@ -145,7 +145,7 @@ struct SettingsPane: View {
                     onConfirm: { confirmPermanent = false; permanentDelete = true })
             }
             Section(t("Datos")) {
-                LabeledContent(t("Carpeta de datos"), value: appEnvironment().supportDirectory.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+                LabeledContent(t("Carpeta de datos"), value: appEnvironment().supportDirectory.replacingOccurrences(of: displayHome, with: "~"))
                 HStack {
                     Button(t("Mostrar en Finder")) {
                         let url = URL(fileURLWithPath: appEnvironment().supportDirectory)

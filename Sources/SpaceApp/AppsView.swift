@@ -195,7 +195,7 @@ extension ContentView {
                 }
                 Text(item.reason).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 if let path = item.path {
-                    Text(path.replacingOccurrences(of: NSHomeDirectory(), with: "~")).font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary).lineLimit(1).truncationMode(.middle).help(path)
+                    Text(path.replacingOccurrences(of: displayHome, with: "~")).font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary).lineLimit(1).truncationMode(.middle).help(path)
                 }
             }
         }
@@ -233,7 +233,7 @@ extension ContentView {
                                         }
                                         Text(item.reason).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                                         ForEach(item.action?.paths ?? [], id: \.self) { path in
-                                            Text(path.replacingOccurrences(of: NSHomeDirectory(), with: "~")).font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary).lineLimit(1).truncationMode(.middle)
+                                            Text(path.replacingOccurrences(of: displayHome, with: "~")).font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary).lineLimit(1).truncationMode(.middle)
                                         }
                                     }
                                 }

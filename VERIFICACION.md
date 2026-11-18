@@ -356,3 +356,17 @@ Hechas con clics sobre una carpeta personal sintética, sin ejecutar ningún pla
     - la barra lateral muestra «Borrado definitivo activado», que lleva a Ajustes;
     - «Revisar y limpiar» abre el plan con la franja roja, «Borrar definitivamente: …» en cada paso que va a la Papelera y la nota final sobre /Applications y los comandos.
   - El plan se canceló y el registro no tiene acciones nuevas. El ajuste se apagó y se borró la clave `borradoDefinitivo` para dejarlo como estaba.
+
+## README con capturas (18-11-2026)
+
+- `scripts/demo-home.sh /private/tmp/margin-demo` crea en 4 s una carpeta personal ficticia con proyectos, cachés, Xcode, Gradle, npm, nvm, descargas, copia del iPhone, Papelera, 8 apps de ejemplo (iconos de `scripts/demo-icon.swift`) y restos de apps borradas. Los archivos grandes son clones APFS: Margin ve unos 33 GB, pero en disco ocupan 336 MB (las semillas, en `<carpeta>.semillas`).
+- `margin dev --text` sobre esa carpeta no muestra ninguna ruta real (0 apariciones del usuario). Lo único real son el total y el disponible del disco, y las descargas de Homebrew (41 MB).
+- Hallazgos al preparar las apps de ejemplo:
+  - fuera de las carpetas que indexa Spotlight, «último uso» es la fecha de modificación del `.app`;
+  - sin ejecutable, macOS dibuja el icono apagado;
+  - con un `.icns` de un solo tamaño o con margen propio, macOS 26 lo encoge dentro de una placa blanca. Se usa el juego completo de tamaños y el icono a sangre.
+- Cambios en la app para las capturas:
+  - con `MARGIN_HOME`, las rutas se muestran con `~` respecto a esa carpeta y no a la real;
+  - `MARGIN_CAPTURAS=1` oculta la etiqueta «Modo de prueba».
+- Las capturas se hicieron con otra instancia (`open -n --env … --args -tema claro|oscuro -idioma es -ApplePersistenceIgnoreState YES`). Los argumentos no cambian los ajustes guardados: después siguen sin `tema`, `analisisAlAbrir` ni `borradoDefinitivo`, e `idioma` sigue en `es`. La Margin de Jorge se volvió a abrir normal.
+- La herramienta de capturas dibuja un cursor donde hizo el último clic. Para que no salga, antes de cada captura se hace un desplazamiento nulo en la esquina de la ventana.
