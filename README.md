@@ -89,7 +89,7 @@ Los resultados incluyen rutas y nombres. Al consultarlos desde un asistente pasa
 ## Pruebas
 
 ```sh
-CLANG_MODULE_CACHE_PATH="$TMPDIR/margen-clang-cache" swift test --disable-sandbox --scratch-path "$TMPDIR/margen-build"
+CLANG_MODULE_CACHE_PATH="$TMPDIR/margin-clang-cache" swift test --disable-sandbox --scratch-path "$TMPDIR/margin-build"
 ```
 
 Fixtures sintéticos creados y retirados por las pruebas, sin limpieza sobre archivos personales. Para probar la app de punta a punta sobre una carpeta personal sintética: `MARGIN_HOME=/ruta` (con `MARGIN_SCAN`, `MARGIN_TAB` y `MARGIN_VIEW` para abrirla analizando una carpeta, en una pestaña o en el mapa). En ese modo los comandos de las herramientas y Vaciar Papelera se bloquean; las variables antiguas `MARGEN_*` y `ESPACIO_*` siguen valiendo. Consultar [evidencias](VERIFICACION.md) para resultados y límites comprobados.
