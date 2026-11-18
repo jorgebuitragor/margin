@@ -6,8 +6,9 @@
 # versiones. Es un certificado propio que solo existe en este Mac: no hace falta cuenta de desarrollador de Apple, no
 # se marca como de confianza ni se toca la configuración de seguridad del sistema.
 #
-# La clave privada se genera en una carpeta temporal, se importa al llavero (solo `codesign` puede usarla sin
-# preguntar) y se borra del disco.
+# La clave privada se genera en una carpeta temporal, se importa al llavero (solo `codesign` puede usarla) y se borra
+# del disco. macOS puede preguntar una vez, al firmar, si `codesign` puede usar la clave «Margin Local»: hay que
+# escribir la contraseña de inicio de sesión y elegir «Permitir siempre» para que no vuelva a preguntar.
 set -euo pipefail
 name="Margin Local"
 keychain="$HOME/Library/Keychains/login.keychain-db"

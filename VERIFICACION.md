@@ -326,6 +326,12 @@ Hechas con clics sobre una carpeta personal sintética, sin ejecutar ningún pla
 ## Firma estable (18-11-2026)
 
 - `scripts/firma-local.sh` creó la identidad «Margin Local» en el llavero de inicio de sesión: certificado propio de 10 años para firma de código, sin marcarlo como de confianza ni tocar ajustes del sistema. La clave privada se generó en una carpeta temporal que se borra; solo `codesign` puede usarla sin preguntar. Volver a ejecutarlo no hace nada.
-- `codesign` firma con ella sin diálogos. La app instalada queda con `Authority=Margin Local` y el requisito designado `identifier "local.margin.mac" and certificate leaf = H"42cf6410…"`, que ya no depende del binario: es el mismo en cada compilación, y es lo que macOS usa para recordar permisos.
+- `codesign` firmó con ella sin diálogos las dos primeras veces; en la tercera macOS preguntó si `codesign` podía usar la clave. Jorge eligió «Permitir siempre» y la firma terminó (está explicado en `firma-local.sh`). La app instalada queda con `Authority=Margin Local` y el requisito designado `identifier "local.margin.mac" and certificate leaf = H"42cf6410…"`, que ya no depende del binario: es el mismo en cada compilación, y es lo que macOS usa para recordar permisos.
 - Margin abre normalmente con la nueva firma y no hay rechazos en el registro del sistema.
 - Pendiente de Jorge: los permisos dados antes, con la firma ad hoc, pueden no valer; hay que darlos una vez más.
+
+## «Marcar todos» en restos de apps borradas (18-11-2026)
+
+- Encima de la lista de restos hay una casilla de grupo: «Select all», con el total («8 leftovers · 943.1 MB» con datos reales). Si hay una búsqueda, dice «Select all matching» y solo afecta a los restos visibles.
+- Es un `Toggle(sources:)` de SwiftUI, así que macOS dibuja el estado mixto real (guion) cuando solo hay algunos marcados. Un primer intento con un icono superpuesto se veía como un cuadrado relleno, sin guion, y se descartó.
+- Con clics en la app real: marcar Whisky deja la casilla con guion y la barra flotante en «1 item in the plan · 822 MB»; pulsarla marca los 8 («8 items in the plan · 943.1 MB»); pulsarla otra vez los desmarca y la barra desaparece. Buscando «openai» dice «Select all matching · 2 leftovers · 14.4 MB». No se creó ni se aplicó ningún plan.

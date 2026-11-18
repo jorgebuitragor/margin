@@ -217,6 +217,7 @@ extension ContentView {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
                         Text(t("Carpetas con el identificador de una app que no está instalada. Suelen ser restos, pero algunas herramientas sin app guardan datos así: revisa cada una.")).font(.caption).foregroundStyle(.secondary)
+                        selectAllOrphans(orphans)
                         VStack(spacing: 0) {
                             ForEach(orphans) { item in
                                 HStack(alignment: .top, spacing: 10) {
@@ -248,5 +249,30 @@ extension ContentView {
             }
         }
         .transition(.opacity)
+    }
+
+    /// Marca o desmarca de una vez los restos visibles (respeta la búsqueda). Con `sources`, macOS dibuja la casilla en
+    /// estado mixto (guion) cuando solo hay algunos marcados, y al pulsarla los marca todos.
+    func selectAllOrphans(_ orphans: [DevItem]) -> some View {
+        let selectable = orphans.filter(\.canDelete)
+        let total = selectable.reduce(Int64(0)) { $0 + ($1.bytes ?? 0) }
+        let marks = selectable.map { item in
+            Binding(get: { appChecked.contains(item.id) }, set: { on in
+                withAnimation(.smooth) { if on { appChecked.insert(item.id) } else { appChecked.remove(item.id) } }
+            })
+        }
+        return HStack(spacing: 10) {
+            Toggle(sources: marks, isOn: \.self) {
+                Text(appSearch.isEmpty ? t("Marcar todos") : t("Marcar todos los que coinciden"))
+                    .font(.callout.weight(.medium))
+            }
+            .toggleStyle(.checkbox)
+            Spacer()
+            Text("\(tn(selectable.count, "resto", "restos")) · \(size(total))")
+                .monospacedDigit().font(.callout).foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 8)
+        .surface(cornerRadius: 14, highContrast: highContrast)
+        .disabled(selectable.isEmpty)
     }
 }
