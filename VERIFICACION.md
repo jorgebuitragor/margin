@@ -348,3 +348,7 @@ Hechas con clics sobre una carpeta personal sintética, sin ejecutar ningún pla
   - La tarjeta «Papelera» aparece en Inicio sin haber analizado. «Vaciar Papelera…» y «Ver tamaño…» van uno debajo del otro, porque juntos recortaban el botón.
   - Margin › «Vaciar Papelera…» (⇧⌘⌫) abre la confirmación; se canceló. El registro sigue con un único vaciado, de las 08:39 UTC, anterior a estas pruebas.
   - **Fallo encontrado**: el diálogo del sistema dejaba en rojo, como botón predeterminado, «Vaciar definitivamente», así que Retorno habría vaciado la Papelera. `.keyboardShortcut(.defaultAction)` en Cancelar no lo cambia, y no se comprobó pulsando Retorno para no vaciar la Papelera real. Se sustituyó por una confirmación propia (`DestructiveConfirmation`), en la que Retorno y Escape cancelan; también se usa al activar el borrado definitivo.
+- **Con la versión instalada** (16:5x):
+  - Margin › «Vaciar Papelera…» abre la confirmación propia, con «Vaciar definitivamente» y «Cancelar»; se canceló.
+  - Ajustes › «Borrado definitivo» aparece apagado y muestra en naranja el riesgo de activarlo. Pulsar el interruptor abre «¿Activar el borrado definitivo?»; al cancelar sigue apagado (`borradoDefinitivo` no se guarda).
+  - Quedó sin ver con clics el estado activado (aviso en la barra lateral y en cada plan): Jorge estaba usando la app. El ajuste sigue apagado.
