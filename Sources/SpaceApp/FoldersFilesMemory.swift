@@ -119,25 +119,34 @@ extension ContentView {
                 Text(t("Candado: protegida (sistema, configuración, dependencias). Nube: sincronizada. Ambas se miden pero no se ofrecen para limpieza. «+» indica que hubo elementos ilegibles y el total es un mínimo."))
                     .font(.caption).foregroundStyle(.secondary)
             } else if !model.busy {
-                ContentUnavailableView {
-                    Label(t("Empieza por una carpeta"), systemImage: "folder.badge.questionmark")
-                } description: {
-                    Text(t("Elige una carpeta o usa un atajo. Verás cuánto ocupa cada carpeta, también las de Library y las dependencias de proyectos. Analizar la carpeta personal completa tarda unos 3 minutos."))
-                } actions: {
-                    GlassEffectContainer(spacing: 10) {
-                        HStack(spacing: 10) {
-                            ForEach(AppModel.quickFolders(), id: \.path) { item in
-                                Button(item.title, systemImage: "folder") { model.scan(item.url) }.buttonStyle(.glass)
-                            }
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                emptyFolderState(t("Elige una carpeta o usa un atajo. Verás cuánto ocupa cada carpeta, también las de Library y las dependencias de proyectos. Analizar la carpeta personal completa tarda unos 3 minutos."))
             }
         }
         .padding(.horizontal, 28).padding(.top, 12).padding(.bottom, 16)
         .animation(.smooth(duration: 0.35), value: folderView)
         .animation(.smooth(duration: 0.35), value: model.report?.root)
+    }
+
+    /// Estado vacío de Carpetas y Archivos con atajos a las carpetas frecuentes. Es una vista propia:
+    /// ContentUnavailableView encogía los botones al ancho del texto y cortaba sus nombres.
+    func emptyFolderState(_ description: String) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: "folder.badge.questionmark").font(.system(size: 44)).foregroundStyle(.secondary)
+                .symbolEffect(.bounce, options: .nonRepeating)
+            Text(t("Empieza por una carpeta")).font(.title3.bold())
+            Text(description).multilineTextAlignment(.center).foregroundStyle(.secondary).frame(maxWidth: 440)
+            GlassEffectContainer(spacing: 10) {
+                HStack(spacing: 10) {
+                    ForEach(AppModel.quickFolders(), id: \.path) { item in
+                        Button(item.title, systemImage: "folder") { model.scan(item.url) }
+                            .buttonStyle(.glass)
+                            .fixedSize()
+                    }
+                }
+            }
+            .padding(.top, 6)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     var filtered: [FileEntry] {
@@ -183,8 +192,7 @@ extension ContentView {
                 }.frame(width: 300)
             }
             if model.report == nil && !model.busy {
-                ContentUnavailableView(t("Empieza por una carpeta"), systemImage: "folder.badge.questionmark", description: Text(t("Elige, por ejemplo, Descargas. Verás tamaños y razones para revisar o conservar cada elemento.")))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                emptyFolderState(t("Elige, por ejemplo, Descargas. Verás tamaños y razones para revisar o conservar cada elemento."))
             } else {
                 Table(filtered, selection: $selected) {
                     TableColumn("") { entry in
