@@ -477,3 +477,6 @@ Hechas con clics sobre una carpeta personal sintética, sin ejecutar ningún pla
   - Con `xattr -dr com.apple.quarantine /Applications/Margin.app` **antes** de usarlo, `margin status` responde (código 0) y el MCP informa la versión 0.10.2.
   - El aviso del cask y los dos README dicen ahora: quitar la cuarentena antes de usar el comando y, si sale el aviso de macOS, pulsar «Aceptar», no «Mover a la Papelera». `brew style` sin avisos.
   - La copia de prueba se desinstaló y la Margin de Jorge se volvió a abrir.
+- **Release `v0.10.3`**:
+  - Publicada con ZIP, `appcast.xml` y `Margin.dmg`. El cask quedó en 0.10.3, con el SHA-256 del `.dmg` y el aviso de la cuarentena intacto, y el enlace directo lleva a la v0.10.3.
+  - La copia de Jorge (compilación 44) ofreció la 0.10.3 con sus notas y se actualizó a la 47. Volvió a abrirse con la misma firma, y `margin` sigue funcionando.
