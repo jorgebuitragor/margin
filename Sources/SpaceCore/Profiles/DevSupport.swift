@@ -3,36 +3,65 @@ import Darwin
 
 /// Medición de una ruta con la lógica de du -x. Solo metadatos.
 public struct Usage: Sendable, Equatable {
+    /// Espacio que ocupa en el disco: los enlaces duros y las copias idénticas de APFS (clones) cuentan una vez.
     public var allocated: Int64 = 0
     /// Lo que se libera con seguridad al retirar la ruta: el tamaño privado de cada archivo sin otros enlaces duros (en
     /// APFS, lo que no comparte con clones de otros archivos) más las carpetas.
     public var exclusive: Int64 = 0
-    /// Espacio físico aproximado: los enlaces duros una vez y los clones (APFS) por su tamaño privado. Es lo que usa la
-    /// barra del disco: con lo asignado, una carpeta llena de clones (WhatsApp) parecía ocupar cien veces más.
-    public var unique: Int64 = 0
     public var files = 0
     public var partial = false
     /// Fecha de modificación más reciente encontrada (archivos y carpetas).
     public var newest: Date?
 }
 
+/// Lo que APFS informa de los clones de un archivo (copias que macOS hace sin duplicar datos: cp -c, Finder, apps que
+/// reenvían o migran archivos).
+public struct CloneInfo: Sendable, Equatable {
+    /// Lo que se liberaría al borrar el archivo: lo que no comparte con otros. Sin clones, coincide con lo asignado.
+    public var privateSize: Int64
+    /// Identificador de la familia de copias idénticas: los archivos que comparten todos sus datos tienen el mismo.
+    public var cloneID: UInt64
+    public var sharesAllBlocks: Bool
+    /// Cuántos archivos forman la familia.
+    public var familySize: UInt32
+
+    /// Clave para contar una sola vez los datos de una familia de copias idénticas; nil si el archivo no es una de ellas.
+    public var familyKey: UInt64? { sharesAllBlocks && familySize > 1 && cloneID != 0 ? cloneID : nil }
+}
+
 public enum DiskUsage {
-    /// Tamaño privado de un archivo en APFS: lo que se liberaría al borrarlo, sin contar los datos que comparte con
-    /// clones (copias que macOS hace sin duplicar datos: cp -c, Finder, apps que reenvían o migran archivos). En un
-    /// archivo sin clones coincide con su espacio asignado. Nil si el sistema de archivos no lo informa.
-    public static func privateSize(_ path: UnsafePointer<CChar>) -> Int64? {
+    /// Los datos de clones de un archivo en APFS. Nil si el sistema de archivos no informa el tamaño privado.
+    public static func cloneInfo(_ path: UnsafePointer<CChar>) -> CloneInfo? {
         var list = attrlist()
         list.bitmapcount = u_short(ATTR_BIT_MAP_COUNT)
-        list.forkattr = attrgroup_t(ATTR_CMNEXT_PRIVATESIZE)
-        var buffer = (UInt32(0), UInt32(0), UInt32(0), UInt32(0))   // longitud (4 bytes) + off_t sin alinear
-        let status = withUnsafeMutableBytes(of: &buffer) { getattrlist(path, &list, $0.baseAddress, $0.count, UInt32(FSOPT_ATTR_CMN_EXTENDED | FSOPT_NOFOLLOW)) }
+        list.commonattr = attrgroup_t(ATTR_CMN_RETURNED_ATTRS)
+        let wanted = ATTR_CMNEXT_PRIVATESIZE | ATTR_CMNEXT_CLONEID | ATTR_CMNEXT_EXT_FLAGS | ATTR_CMNEXT_CLONE_REFCNT
+        list.forkattr = attrgroup_t(wanted)
+        // longitud (4) + atributos devueltos (20) + tamaño privado (8) + id de clon (8) + flags (8) + familia (4).
+        // Con FSOPT_PACK_INVAL_ATTRS, lo que el volumen no informa ocupa igual su hueco, así los desplazamientos no cambian.
+        var buffer = [UInt8](repeating: 0, count: 64)
+        let status = getattrlist(path, &list, &buffer, buffer.count, UInt32(FSOPT_ATTR_CMN_EXTENDED | FSOPT_NOFOLLOW | FSOPT_PACK_INVAL_ATTRS))
         guard status == 0 else { return nil }
-        return withUnsafeBytes(of: &buffer) { $0.loadUnaligned(fromByteOffset: 4, as: Int64.self) }
+        return buffer.withUnsafeBytes { raw -> CloneInfo? in
+            let returned = raw.loadUnaligned(fromByteOffset: 20, as: UInt32.self)   // attribute_set_t.forkattr
+            guard returned & UInt32(ATTR_CMNEXT_PRIVATESIZE) != 0 else { return nil }
+            let full = returned & UInt32(ATTR_CMNEXT_CLONEID | ATTR_CMNEXT_EXT_FLAGS | ATTR_CMNEXT_CLONE_REFCNT) == UInt32(ATTR_CMNEXT_CLONEID | ATTR_CMNEXT_EXT_FLAGS | ATTR_CMNEXT_CLONE_REFCNT)
+            let flags = full ? raw.loadUnaligned(fromByteOffset: 40, as: UInt64.self) : 0
+            return CloneInfo(privateSize: raw.loadUnaligned(fromByteOffset: 24, as: Int64.self),
+                             cloneID: full ? raw.loadUnaligned(fromByteOffset: 32, as: UInt64.self) : 0,
+                             sharesAllBlocks: flags & UInt64(EF_SHARES_ALL_BLOCKS) != 0,
+                             familySize: full ? raw.loadUnaligned(fromByteOffset: 48, as: UInt32.self) : 0)
+        }
     }
+
+    /// Tamaño privado de un archivo en APFS: lo que se liberaría al borrarlo, sin contar los datos que comparte con
+    /// clones. Nil si el sistema de archivos no lo informa.
+    public static func privateSize(_ path: UnsafePointer<CChar>) -> Int64? { cloneInfo(path)?.privateSize }
 
     public static func measure(_ path: String) -> Usage {
         var usage = Usage()
         var seen = Set<[UInt64]>()
+        var seenFamilies = Set<UInt64>()
         guard let cPath = strdup(path) else { usage.partial = true; return usage }
         defer { free(cPath) }
         var paths: [UnsafeMutablePointer<CChar>?] = [cPath, nil]
@@ -49,18 +78,22 @@ public enum DiskUsage {
             if info == FTS_D {
                 usage.allocated += blocks
                 usage.exclusive += blocks
-                usage.unique += blocks
                 continue
             }
             usage.files += 1
             if st.st_nlink > 1 && info != FTS_SL && info != FTS_SLNONE {
-                if seen.insert([UInt64(bitPattern: Int64(st.st_dev)), UInt64(st.st_ino)]).inserted { usage.allocated += blocks; usage.unique += blocks }
+                if seen.insert([UInt64(bitPattern: Int64(st.st_dev)), UInt64(st.st_ino)]).inserted { usage.allocated += blocks }
+            } else if info == FTS_F, let clone = cloneInfo(entry.pointee.fts_path) {
+                // Las copias idénticas ocupan una vez; al borrar una se libera solo lo que no comparte.
+                if let family = clone.familyKey {
+                    if seenFamilies.insert(family).inserted { usage.allocated += blocks }
+                } else {
+                    usage.allocated += blocks
+                }
+                usage.exclusive += min(clone.privateSize, blocks)
             } else {
                 usage.allocated += blocks
-                // Un clon de otro archivo ocupa poco o nada propio: se libera solo su tamaño privado.
-                let own = info == FTS_F ? (privateSize(entry.pointee.fts_path).map { min($0, blocks) } ?? blocks) : blocks
-                usage.exclusive += own
-                usage.unique += own
+                usage.exclusive += blocks
             }
         }
         if newest > 0 { usage.newest = Date(timeIntervalSince1970: TimeInterval(newest)) }

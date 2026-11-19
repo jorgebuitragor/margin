@@ -45,21 +45,37 @@ final class SpaceCoreTests: XCTestCase {
         XCTAssertTrue(library.folders.contains { $0.depth == 0 && $0.protection == "protected" }, "La raíz se mide como protegida")
         XCTAssertGreaterThan(library.totalAllocated, 0)
     }
-    func testClonesAreMeasuredButNotCountedAsFreeable() throws {
-        // Dos clones APFS de los mismos 2 MB: cada uno «ocupa» 2 MB, pero borrar uno no libera nada propio.
+    func testClonesAreMeasuredOnceAndNotCountedAsFreeable() throws {
+        // Tres clones APFS de los mismos 2 MB: cada uno informa 2 MB, pero los datos están una vez en el disco y borrar
+        // uno no libera nada propio.
         let original = try file("Videos/original.mov", 2_000_000)
-        let clone = original.deletingLastPathComponent().appendingPathComponent("reenviado.mov")
-        XCTAssertEqual(copyfile(original.path, clone.path, nil, copyfile_flags_t(COPYFILE_CLONE_FORCE)), 0, "El disco de pruebas debe ser APFS")
-        let usage = DiskUsage.measure(root.appendingPathComponent("Videos").path)
-        XCTAssertGreaterThanOrEqual(usage.allocated, 4_000_000)
+        let folder = original.deletingLastPathComponent()
+        for name in ["reenviado.mov", "migrado.mov"] {
+            XCTAssertEqual(copyfile(original.path, folder.appendingPathComponent(name).path, nil, copyfile_flags_t(COPYFILE_CLONE_FORCE)), 0, "El disco de pruebas debe ser APFS")
+        }
+        let info = try XCTUnwrap(original.path.withCString { DiskUsage.cloneInfo($0) })
+        XCTAssertNotNil(info.familyKey, "Las copias idénticas forman una familia")
+        XCTAssertEqual(info.familySize, 3)
+        let usage = DiskUsage.measure(folder.path)
+        XCTAssertGreaterThanOrEqual(usage.allocated, 1_900_000)
+        XCTAssertLessThan(usage.allocated, 3_000_000, "Los datos de la familia cuentan una sola vez")
         XCTAssertLessThan(usage.exclusive, 1_000_000, "Lo compartido entre clones no cuenta como liberable")
-        XCTAssertLessThan(usage.unique, 1_000_000, "La barra del disco tampoco cuenta los clones como espacio propio")
         let report = try Scanner.scan(root: root)
-        XCTAssertGreaterThanOrEqual(report.totalAllocated, 4_000_000)
-        XCTAssertLessThan(try XCTUnwrap(report.totalFreeable), report.totalAllocated - 3_000_000)
+        XCTAssertGreaterThanOrEqual(report.totalAllocated, 1_900_000)
+        XCTAssertLessThan(report.totalAllocated, 3_000_000, "El total de la carpeta tampoco cuenta cada copia")
+        XCTAssertLessThan(try XCTUnwrap(report.totalFreeable), 1_000_000)
+        // Una copia que se modifica deja la familia: sus datos nuevos ya son suyos.
+        let edited = folder.appendingPathComponent("migrado.mov")
+        let handle = try FileHandle(forWritingTo: edited)
+        try handle.write(contentsOf: Data(repeating: 7, count: 1_000_000))
+        try handle.close()
+        let afterEdit = DiskUsage.measure(folder.path)
+        XCTAssertGreaterThanOrEqual(afterEdit.exclusive, 900_000, "Lo reescrito es privado de esa copia")
         // Sin clones, lo liberable coincide con lo asignado.
-        try FileManager.default.removeItem(at: clone)
-        XCTAssertGreaterThanOrEqual(DiskUsage.measure(root.appendingPathComponent("Videos").path).exclusive, 1_900_000)
+        for name in ["reenviado.mov", "migrado.mov"] { try FileManager.default.removeItem(at: folder.appendingPathComponent(name)) }
+        let alone = DiskUsage.measure(folder.path)
+        XCTAssertGreaterThanOrEqual(alone.exclusive, 1_900_000)
+        XCTAssertEqual(alone.exclusive, alone.allocated)
     }
 
     func testLinksAreNotFollowed() throws {

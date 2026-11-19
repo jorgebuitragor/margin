@@ -127,7 +127,7 @@ public enum StorageAnalyzer {
         }
         for (index, job) in list.enumerated() {
             let usage = box.results[index] ?? Usage()
-            bytes[job.kind, default: 0] += usage.unique
+            bytes[job.kind, default: 0] += usage.allocated
             if usage.partial { partial.insert(job.kind) }
         }
         return build(capacity: capacity, measured: bytes, partial: partial)

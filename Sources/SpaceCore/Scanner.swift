@@ -145,6 +145,8 @@ struct Walker {
     var rootProtection: Protection?
     private var stack: [Frame] = []
     private var seenInodes = Set<InodeKey>()
+    /// Familias de copias idénticas (clones de APFS) ya contadas: sus datos ocupan el disco una sola vez.
+    private var seenFamilies = Set<UInt64>()
     private var candidates: [FileEntry] = []
     private var threshold: Int64 = .min
 
@@ -257,18 +259,20 @@ struct Walker {
     private mutating func addFile(path: String, info: Darwin.stat?, isLink: Bool) {
         guard let stat = info else { markPartial(); return }
         let allocated = Int64(stat.st_blocks) * 512
-        // Para los totales, un inodo con varios enlaces duros cuenta una sola vez (como du).
+        // Para los totales, un inodo con varios enlaces duros cuenta una sola vez (como du), y una familia de copias
+        // idénticas de APFS también: sus datos están una vez en el disco aunque cada copia informe su tamaño completo.
         var counted = allocated
+        var own = allocated
         if stat.st_nlink > 1 && !isLink {
             if !seenInodes.insert(InodeKey(device: stat.st_dev, inode: UInt64(stat.st_ino))).inserted { counted = 0 }
+            own = 0 // Lo liberable: con varios enlaces, nada (sigue en los otros).
+        } else if !isLink && (stat.st_mode & S_IFMT) == S_IFREG, let clone = path.withCString({ DiskUsage.cloneInfo($0) }) {
+            if let family = clone.familyKey, !seenFamilies.insert(family).inserted { counted = 0 }
+            own = min(clone.privateSize, allocated) // Lo que no comparte con clones de otros archivos.
         }
         if !stack.isEmpty {
             stack[stack.count - 1].allocated += counted
-            // Lo liberable: el tamaño privado de un archivo con un solo enlace; con varios, nada (sigue en los otros).
-            if stat.st_nlink <= 1 || isLink {
-                let own = !isLink && (stat.st_mode & S_IFMT) == S_IFREG ? (path.withCString { DiskUsage.privateSize($0) }.map { min($0, allocated) } ?? allocated) : allocated
-                stack[stack.count - 1].freeable += own
-            }
+            stack[stack.count - 1].freeable += own
             stack[stack.count - 1].files += 1
             if stack[stack.count - 1].protection != nil { return } // Se mide, pero no se lista.
         }
