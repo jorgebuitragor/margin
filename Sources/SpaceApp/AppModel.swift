@@ -213,6 +213,7 @@ final class AppModel: ObservableObject {
         Task {
             let env = appEnvironment()
             trash = await Task.detached(priority: .userInitiated) { TrashStatus.read(env) }.value
+            refreshCapacity()
         }
     }
     func emptyTrash() {
@@ -284,6 +285,9 @@ final class AppModel: ObservableObject {
         var measured = Self.measured(storage)
         // El intercambio cambia de un minuto a otro: se relee en vivo (solo si la medición ya lo separaba de macOS).
         if measured[.swap] != nil, let swap = StorageAnalyzer.swapFileBytes() { measured[.swap] = swap }
+        // La Papelera, con su tamaño actual si macOS deja leerla: así su tramo y su porcentaje aparecen en cuanto tiene
+        // algo y desaparecen al vaciarla, sin esperar a la próxima medición del disco.
+        if let bytes = trash?.bytes { measured[.trash] = bytes }
         self.storage = StorageAnalyzer.build(capacity: capacity, measured: measured, partial: Set(storage.segments.filter(\.partial).map(\.kind)), date: storage.date)
     }
 

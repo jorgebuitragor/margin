@@ -182,7 +182,8 @@ struct ContentView: View {
         if tab == "Inicio" {
             // La Papelera, siempre a la vista en Inicio: con su tamaño cuando macOS deja leerlo.
             ToolbarItem {
-                Button(model.trash?.bytes.map { t("Vaciar Papelera (%@)…", size($0)) } ?? t("Vaciar Papelera…"), systemImage: "trash") { model.askEmptyTrash() }
+                // Con la Papelera vacía (y legible) el botón lo dice, en vez de «Vaciar Papelera (0 bytes)…».
+                Button(model.trash?.items == 0 ? t("Papelera vacía") : model.trash?.bytes.map { t("Vaciar Papelera (%@)…", size($0)) } ?? t("Vaciar Papelera…"), systemImage: "trash") { model.askEmptyTrash() }
                     .labelStyle(.titleAndIcon)
                     .disabled(model.emptying || model.trash?.items == 0)
                     .help(model.trash?.items == 0 ? t("La Papelera está vacía.") : t("Vacía la Papelera para siempre, con confirmación."))

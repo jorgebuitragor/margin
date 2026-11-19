@@ -2,6 +2,11 @@
 
 Cada versión publicada en [GitHub Releases](https://github.com/jorgebuitragor/margin/releases). Las anteriores a la 0.10 eran solo locales: su detalle está en [PLAN.md](PLAN.md) y [VERIFICACION.md](VERIFICACION.md).
 
+## Sin publicar
+
+- La Papelera aparece en la barra del disco de Inicio con su tamaño y su porcentaje en cuanto tiene algo, y desaparece al vaciarla, sin esperar a volver a medir el disco (necesita acceso total al disco).
+- Con la Papelera vacía, el botón de Inicio dice «Papelera vacía».
+
 ## 0.10.1
 
 - Margin gasta mucha menos CPU:

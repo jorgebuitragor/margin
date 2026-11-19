@@ -258,6 +258,7 @@ let english: [String: String] = [
     "Buscar apps": "Search apps",
     "Quitar selección": "Clear selection",
     "Marcar todos": "Select all",
+    "Papelera vacía": "Trash is empty",
     "Rendimiento": "Performance",
     "minuto": "minute",
     "minutos": "minutes",

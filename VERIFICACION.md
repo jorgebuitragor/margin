@@ -420,3 +420,11 @@ Hechas con clics sobre una carpeta personal sintética, sin ejecutar ningún pla
   - Publicada con `Margin-0.10.1.zip`, `appcast.xml` y `Margin.dmg`. El cask del tap quedó en 0.10.1, con el SHA-256 del nuevo `.dmg`, y el enlace directo del README lleva a la v0.10.1.
   - La copia de Jorge (36) ofreció la 37 y se actualizó.
   - Fallo encontrado: la ventana de Sparkle perdía los subpuntos del CHANGELOG, porque `release.sh` solo convertía las líneas «- ». Ahora genera listas anidadas, y el `appcast.xml` de la v0.10.1 se volvió a subir con las notas completas; el ZIP y su firma no cambiaron.
+
+## Papelera en vivo en la barra del disco (18-11-2026)
+
+- El tramo «Papelera» de la barra de Inicio usa el tamaño leído de la Papelera (al abrir, al volver a la app y antes de vaciarla) en vez del de la última medición del disco.
+- Prueba con un archivo propio de 300 MB en la Papelera de Jorge, que estaba vacía:
+  - la leyenda mostró «Papelera 320,5 MB · 0,1 %» con «Vaciar…», el botón «Vaciar Papelera (320,5 MB)…» y la tarjeta «1 elemento»;
+  - después se quitó ese archivo con `rm` (solo ese) y la Papelera quedó vacía como estaba. No se vació la Papelera.
+- Con la Papelera vacía, el botón de Inicio dice «Papelera vacía» en lugar de «Vaciar Papelera (0 bytes)…».
