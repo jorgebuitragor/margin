@@ -9,7 +9,8 @@ extension ContentView {
         ("Cachés de apps", "square.stack.3d.up", ["app-caches"]),
         ("Registros", "doc.text", ["logs"]),
         ("Descargas", "arrow.down.circle", ["downloads"]),
-        ("Copias de iPhone", "iphone", ["ios-backups"])
+        ("Copias de iPhone", "iphone", ["ios-backups"]),
+        ("WhatsApp", "bubble.left.and.bubble.right", ["whatsapp"])
     ]
 
     var diskCard: some View {
@@ -317,6 +318,12 @@ extension ContentView {
                             withAnimation(.smooth) { if included { devChecked.remove(item.id) } else { devChecked.insert(item.id) } }
                         }
                         .buttonStyle(.glass).controlSize(.large)
+                    } else if item.action?.kind == .manual {
+                        Text(t("Se hace desde la propia app: Margin solo lo mide y te dice dónde.")).font(.caption).foregroundStyle(.secondary)
+                        if item.profile == "whatsapp", let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "net.whatsapp.WhatsApp") {
+                            Button(t("Abrir WhatsApp"), systemImage: "arrow.up.forward.app") { NSWorkspace.shared.openApplication(at: app, configuration: .init()) }
+                                .buttonStyle(.glass).controlSize(.large)
+                        }
                     } else {
                         Text(t("Margin no lo propone: se mide, pero no se puede incluir en un plan.")).font(.caption).foregroundStyle(.secondary)
                     }

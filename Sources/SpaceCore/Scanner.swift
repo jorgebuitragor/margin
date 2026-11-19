@@ -36,6 +36,9 @@ public struct FolderTotal: Identifiable, Codable, Sendable {
     /// Profundidad respecto a la raíz analizada (0 = la raíz).
     public let depth: Int
     public let allocatedBytes: Int64
+    /// Lo que se liberaría al borrar la carpeta, como mínimo: el tamaño privado de cada archivo (APFS), sin lo que
+    /// comparte con clones ni archivos con otros enlaces duros. Nil en análisis guardados antes de existir.
+    public var freeableBytes: Int64? = nil
     public let files: Int
     /// Hubo elementos ilegibles dentro: el total es un mínimo.
     public let partial: Bool
@@ -66,8 +69,13 @@ public struct ScanReport: Codable, Sendable {
     public var folders: [FolderTotal] = []
     /// Espacio asignado de toda la raíz. Si `cancelled` o hay incidencias, es un mínimo.
     public var totalAllocated: Int64 = 0
+    /// Lo que se liberaría como mínimo al borrar la carpeta analizada (ver `FolderTotal.freeableBytes`).
+    public var totalFreeable: Int64? = nil
     /// Proveedor de sincronización que cubre la raíz entera, si lo hay.
     public var syncedBy: String?
+    /// La carpeta analizada está protegida (la Biblioteca, datos de apps, paquetes…): se recorre solo para medir sus
+    /// subcarpetas; no se listan archivos ni se propone nada. Es el motivo de la protección.
+    public var measureOnly: String?
     public var issues: [String] = []
     public var visited = 0
     public var omitted = 0
@@ -96,10 +104,12 @@ public enum Scanner {
         guard root.path != "/" else { throw ScanError.protectedRoot(loc("Elige una carpeta de usuario, no la raíz del sistema.", "Choose a user folder, not the system root.")) }
         let rootValues = try root.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey, .isAliasFileKey, .isPackageKey])
         guard rootValues.isDirectory == true, rootValues.isSymbolicLink != true, rootValues.isAliasFile != true else { throw ScanError.invalidRoot }
-        if let reason = Classifier.protectedReason(root.resolvingSymlinksInPath(), isPackage: rootValues.isPackage == true) {
-            throw ScanError.protectedRoot(reason)
-        }
         var walker = Walker(rootPath: root.path, options: options)
+        // Una carpeta protegida no se rechaza: se mide para ver qué ocupa por dentro, sin listar ni proponer nada.
+        if let reason = Classifier.protectedReason(root.resolvingSymlinksInPath(), isPackage: rootValues.isPackage == true) {
+            walker.report.measureOnly = reason
+            walker.rootProtection = Protection(kind: "protected", classification: Classification(category: .protected, reason: reason, consequence: loc("Eliminarlo podría impedir funcionamiento o recuperación de datos.", "Removing it could break something or prevent data recovery."), rule: "protected"))
+        }
         if let sync = SyncDetector.provider(forDirectoryOrAncestors: root) {
             walker.report.syncedBy = sync.provider
             walker.rootProtection = Protection(kind: "sync", classification: Classifier.synced(sync.provider))
@@ -120,6 +130,7 @@ struct Walker {
         let path: String
         let depth: Int
         var allocated: Int64 = 0
+        var freeable: Int64 = 0
         var files = 0
         var partial = false
         /// Protección heredada o propia; `startsHere` indica que esta carpeta es la que la origina.
@@ -199,11 +210,11 @@ struct Walker {
     private mutating func enterDirectory(path: String, depth: Int, info: Darwin.stat?) {
         let ownBytes = info.map { Int64($0.st_blocks) * 512 } ?? 0
         if let parent = stack.last, let protection = parent.protection {
-            stack.append(Frame(path: path, depth: depth, allocated: ownBytes, protection: protection, startsHere: false))
+            stack.append(Frame(path: path, depth: depth, allocated: ownBytes, freeable: ownBytes, protection: protection, startsHere: false))
             return
         }
         if depth == 0 {
-            stack.append(Frame(path: path, depth: depth, allocated: ownBytes, protection: rootProtection, startsHere: false))
+            stack.append(Frame(path: path, depth: depth, allocated: ownBytes, freeable: ownBytes, protection: rootProtection, startsHere: false))
             return
         }
         let url = URL(fileURLWithPath: path, isDirectory: true)
@@ -213,7 +224,7 @@ struct Walker {
         } else if let provider = SyncDetector.provider(forDirectory: url) {
             protection = Protection(kind: "sync", classification: Classifier.synced(provider))
         }
-        stack.append(Frame(path: path, depth: depth, allocated: ownBytes, protection: protection, startsHere: protection != nil))
+        stack.append(Frame(path: path, depth: depth, allocated: ownBytes, freeable: ownBytes, protection: protection, startsHere: protection != nil))
     }
 
     private func isPackage(_ url: URL) -> Bool {
@@ -227,13 +238,15 @@ struct Walker {
         frame.partial = frame.partial || partial
         if !stack.isEmpty {
             stack[stack.count - 1].allocated += frame.allocated
+            stack[stack.count - 1].freeable += frame.freeable
             stack[stack.count - 1].files += frame.files
             if frame.partial { stack[stack.count - 1].partial = true }
         } else {
             report.totalAllocated = frame.allocated
+            report.totalFreeable = frame.freeable
         }
         if frame.depth == 0 || (frame.depth <= options.folderDepth && frame.allocated >= options.minFolderBytes) {
-            report.folders.append(FolderTotal(path: frame.path, depth: frame.depth, allocatedBytes: frame.allocated, files: frame.files, partial: frame.partial, protection: frame.protection?.kind, reason: frame.protection?.classification.reason))
+            report.folders.append(FolderTotal(path: frame.path, depth: frame.depth, allocatedBytes: frame.allocated, freeableBytes: frame.freeable, files: frame.files, partial: frame.partial, protection: frame.protection?.kind, reason: frame.protection?.classification.reason))
         }
         if frame.startsHere, let protection = frame.protection {
             report.omitted += 1
@@ -251,6 +264,11 @@ struct Walker {
         }
         if !stack.isEmpty {
             stack[stack.count - 1].allocated += counted
+            // Lo liberable: el tamaño privado de un archivo con un solo enlace; con varios, nada (sigue en los otros).
+            if stat.st_nlink <= 1 || isLink {
+                let own = !isLink && (stat.st_mode & S_IFMT) == S_IFREG ? (path.withCString { DiskUsage.privateSize($0) }.map { min($0, allocated) } ?? allocated) : allocated
+                stack[stack.count - 1].freeable += own
+            }
             stack[stack.count - 1].files += 1
             if stack[stack.count - 1].protection != nil { return } // Se mide, pero no se lista.
         }

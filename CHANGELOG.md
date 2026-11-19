@@ -2,6 +2,15 @@
 
 Cada versión publicada en [GitHub Releases](https://github.com/jorgebuitragor/margin/releases). Las anteriores a la 0.10 eran solo locales: su detalle está en [PLAN.md](PLAN.md) y [VERIFICACION.md](VERIFICACION.md).
 
+## Sin publicar
+
+- Las carpetas protegidas (la Biblioteca, datos de apps…) se pueden analizar en modo «solo medir»: se ve qué ocupa cada subcarpeta, sin listar archivos ni proponer nada. Antes, Margin se negaba a analizarlas. También desde el árbol y el mapa (clic derecho › Analizar esta carpeta).
+- Margin mide el espacio real: en APFS, las copias que macOS hace sin duplicar datos («clones») ya no cuentan como espacio propio.
+  - Al analizar una carpeta, si lo que se liberaría al borrarla es mucho menor que lo que ocupa, se ven las dos cifras («libera ≥ X»).
+  - «Recuperable» y la barra del disco usan el espacio real. Antes, una carpeta llena de clones podía parecer cien veces más grande: la de WhatsApp marcaba 131 GB y libera menos de 1 GB.
+- WhatsApp en el análisis inteligente: mide sus chats y archivos y explica que se gestionan dentro de WhatsApp (Ajustes › Almacenamiento), con un botón para abrirlo. Nunca entra en un plan.
+- Con «Acceso total al disco», la barra del disco cuenta también los contenedores de otras apps como «Datos de apps».
+
 ## 0.10.3
 
 - Al vaciar la Papelera, Margin dice exactamente qué se borró («Se borraron para siempre 3 elementos (1,2 GB)»), medido justo antes de vaciarla, y el espacio disponible ahora. Antes solo comparaba el espacio antes y después, que con poco contenido salía igual por el redondeo y que macOS a veces tarda unos segundos en actualizar.

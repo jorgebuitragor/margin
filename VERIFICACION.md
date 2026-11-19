@@ -480,3 +480,23 @@ Hechas con clics sobre una carpeta personal sintética, sin ejecutar ningún pla
 - **Release `v0.10.3`**:
   - Publicada con ZIP, `appcast.xml` y `Margin.dmg`. El cask quedó en 0.10.3, con el SHA-256 del `.dmg` y el aviso de la cuarentena intacto, y el enlace directo lleva a la v0.10.3.
   - La copia de Jorge (compilación 44) ofreció la 0.10.3 con sus notas y se actualizó a la 47. Volvió a abrirse con la misma firma, y `margin` sigue funcionando.
+
+## Library, WhatsApp y espacio real (19-11-2026)
+
+- **Problema 1**: Library era lo que más ocupaba (200 GB), pero Margin se negaba a analizarla (`protectedRoot`) y el árbol se quedaba en `group.net.whatsapp.WhatsApp.shared` (131,7 GB).
+  - **Ahora**: una carpeta protegida se analiza en modo «solo medir»: totales por subcarpeta, sin archivos listados ni propuestas. «Analizar esta carpeta» funciona también en las protegidas.
+  - Con WhatsApp: `Message/Media` marcaba 131,44 GB. No se abrieron las carpetas de los chats.
+- **Problema 2**: WhatsApp › Ajustes › Almacenamiento decía 458,8 MB en uso. Las cuentas del disco tampoco cuadraban con 131 GB (227 GB en uso; macOS, apps y desarrollo ya sumaban 150).
+  - **Causa**: clones de APFS. Cada copia informa todo su tamaño asignado, aunque comparta los datos.
+  - **Ahora**: `DiskUsage.privateSize` lee `ATTR_CMNEXT_PRIVATESIZE` con `getattrlist`. Comprobado aparte: un archivo de 20 MB con un clon da 0 de tamaño privado; sin clon, 20 MB.
+  - El análisis de carpetas suma `freeableBytes`. `Usage.exclusive` («Recuperable») y el nuevo `Usage.unique` (la barra del disco) cuentan los clones por su tamaño privado.
+  - En la app, la carpeta de WhatsApp: «131,73 GB» ocupados, pero «se liberaría al borrarla: al menos 676,7 MB» (`Message`: libera ≥ 390,3 MB). Cuadra con lo que dice WhatsApp.
+- **WhatsApp en el análisis inteligente**: elemento «para revisar» con acción manual (Ajustes › Almacenamiento › Administrar almacenamiento). Nunca entra en un plan y tiene un botón «Abrir WhatsApp».
+- **Barra del disco**: con acceso total al disco se miden `Group Containers` y `Containers`, uno a uno; Docker sigue en desarrollo y se cuenta una sola vez.
+- **Pruebas**: 85, todas bien.
+  - Clones reales con `copyfile(COPYFILE_CLONE_FORCE)`.
+  - Library en modo «solo medir».
+  - WhatsApp, medido pero manual.
+  - Contenedores y Docker en la barra.
+- **Entorno**: una limpieza de la carpeta temporal a las 3:35 dejó a medias la copia de Sparkle de SwiftPM. Se arregló con `swift package reset`, que la volvió a tomar de la caché compartida en 33 s.
+- **Barra del disco después**: «Datos de apps» 47,4 GB (antes 120,8 GB, con los clones de WhatsApp contados enteros). Desarrollo 66,5 GB, macOS 46,9 GB, apps 19,8 GB, intercambio 7,5 GB y otros 37,9 GB: cabe en lo usado sin recortar.

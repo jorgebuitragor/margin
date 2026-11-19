@@ -4,8 +4,12 @@ import Darwin
 /// Medición de una ruta con la lógica de du -x. Solo metadatos.
 public struct Usage: Sendable, Equatable {
     public var allocated: Int64 = 0
-    /// Bytes de archivos sin otros enlaces duros (más carpetas): lo que se libera con seguridad al retirar la ruta.
+    /// Lo que se libera con seguridad al retirar la ruta: el tamaño privado de cada archivo sin otros enlaces duros (en
+    /// APFS, lo que no comparte con clones de otros archivos) más las carpetas.
     public var exclusive: Int64 = 0
+    /// Espacio físico aproximado: los enlaces duros una vez y los clones (APFS) por su tamaño privado. Es lo que usa la
+    /// barra del disco: con lo asignado, una carpeta llena de clones (WhatsApp) parecía ocupar cien veces más.
+    public var unique: Int64 = 0
     public var files = 0
     public var partial = false
     /// Fecha de modificación más reciente encontrada (archivos y carpetas).
@@ -13,6 +17,19 @@ public struct Usage: Sendable, Equatable {
 }
 
 public enum DiskUsage {
+    /// Tamaño privado de un archivo en APFS: lo que se liberaría al borrarlo, sin contar los datos que comparte con
+    /// clones (copias que macOS hace sin duplicar datos: cp -c, Finder, apps que reenvían o migran archivos). En un
+    /// archivo sin clones coincide con su espacio asignado. Nil si el sistema de archivos no lo informa.
+    public static func privateSize(_ path: UnsafePointer<CChar>) -> Int64? {
+        var list = attrlist()
+        list.bitmapcount = u_short(ATTR_BIT_MAP_COUNT)
+        list.forkattr = attrgroup_t(ATTR_CMNEXT_PRIVATESIZE)
+        var buffer = (UInt32(0), UInt32(0), UInt32(0), UInt32(0))   // longitud (4 bytes) + off_t sin alinear
+        let status = withUnsafeMutableBytes(of: &buffer) { getattrlist(path, &list, $0.baseAddress, $0.count, UInt32(FSOPT_ATTR_CMN_EXTENDED | FSOPT_NOFOLLOW)) }
+        guard status == 0 else { return nil }
+        return withUnsafeBytes(of: &buffer) { $0.loadUnaligned(fromByteOffset: 4, as: Int64.self) }
+    }
+
     public static func measure(_ path: String) -> Usage {
         var usage = Usage()
         var seen = Set<[UInt64]>()
@@ -32,14 +49,18 @@ public enum DiskUsage {
             if info == FTS_D {
                 usage.allocated += blocks
                 usage.exclusive += blocks
+                usage.unique += blocks
                 continue
             }
             usage.files += 1
             if st.st_nlink > 1 && info != FTS_SL && info != FTS_SLNONE {
-                if seen.insert([UInt64(bitPattern: Int64(st.st_dev)), UInt64(st.st_ino)]).inserted { usage.allocated += blocks }
+                if seen.insert([UInt64(bitPattern: Int64(st.st_dev)), UInt64(st.st_ino)]).inserted { usage.allocated += blocks; usage.unique += blocks }
             } else {
                 usage.allocated += blocks
-                usage.exclusive += blocks
+                // Un clon de otro archivo ocupa poco o nada propio: se libera solo su tamaño privado.
+                let own = info == FTS_F ? (privateSize(entry.pointee.fts_path).map { min($0, blocks) } ?? blocks) : blocks
+                usage.exclusive += own
+                usage.unique += own
             }
         }
         if newest > 0 { usage.newest = Date(timeIntervalSince1970: TimeInterval(newest)) }

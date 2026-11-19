@@ -94,6 +94,7 @@ final class AppModel: ObservableObject {
                 visited = output.visited
                 message = output.cancelled ? t("Cancelado · totales parciales") : !output.issues.isEmpty ? t("Terminado con elementos ilegibles · los totales son un mínimo") : output.limited ? t("Análisis terminado · se listan los 20.000 archivos más grandes") : t("Análisis terminado")
                 if let provider = output.syncedBy { message += t(" · carpeta sincronizada con %@: solo se mide", provider) }
+                if output.measureOnly != nil { message += t(" · carpeta protegida: solo se mide, Margin no propone nada aquí") }
             } catch {
                 guard session == current else { return }
                 message = error.localizedDescription

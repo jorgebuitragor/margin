@@ -10,7 +10,9 @@ final class StorageTests: XCTestCase {
             ("Documents/informe.pdf", 3_000_000), ("Developer/app/src.bin", 2_000_000), (".gradle/caches/x.bin", 4_000_000),
             ("Library/Caches/app/c.bin", 1_000_000), ("Library/Developer/Xcode/d.bin", 5_000_000), (".Trash/viejo.bin", 1_500_000),
             ("Applications/Util.app/bin", 500_000),
-            ("Library/Mobile Documents/com~apple~CloudDocs/notas.txt", 200_000), ("Library/Mobile Documents/.Trash/borrado.txt", 300_000)
+            ("Library/Mobile Documents/com~apple~CloudDocs/notas.txt", 200_000), ("Library/Mobile Documents/.Trash/borrado.txt", 300_000),
+            ("Library/Group Containers/group.ejemplo/datos.bin", 100_000), ("Library/Containers/com.ejemplo.app/Data/x.bin", 100_000),
+            ("Library/Containers/com.docker.docker/Data/disco.raw", 100_000)
         ] {
             let url = home.appendingPathComponent(path)
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -34,6 +36,11 @@ final class StorageTests: XCTestCase {
         XCTAssertEqual(kind("Library/Mobile Documents/com~apple~CloudDocs"), .personal, "iCloud Drive son documentos")
         XCTAssertEqual(kind("Library/Mobile Documents/.Trash"), .trash, "Lo borrado de iCloud Drive es Papelera")
         XCTAssertNil(kind("Library/Mobile Documents"), "iCloud Drive se mide por partes para separar su Papelera")
+        // Con la Papelera legible (equivale a «Acceso total al disco») se miden también los contenedores de otras apps.
+        XCTAssertEqual(kind("Library/Group Containers"), .appData)
+        XCTAssertEqual(kind("Library/Containers/com.ejemplo.app"), .appData)
+        XCTAssertEqual(kind("Library/Containers/com.docker.docker"), .development, "Docker cuenta como desarrollo y una sola vez")
+        XCTAssertEqual(jobs.filter { $0.path.hasSuffix("com.docker.docker") }.count, 1)
         XCTAssertNil(kind("Library"), "La Biblioteca se mide por partes, nunca entera")
         XCTAssertFalse(jobs.contains { !$0.path.hasPrefix(home.path) }, "Con una carpeta sintética no se mide el sistema real")
     }

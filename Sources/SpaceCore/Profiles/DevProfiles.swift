@@ -5,7 +5,7 @@ import Foundation
 public enum DevProfiles {
     public static let version = 1
 
-    public static let ids = ["android-sdk", "android-avd", "ios-simulators", "xcode", "project-artifacts", "js-packages", "gradle-maven", "docker", "homebrew", "node-versions", "claude-desktop", "vscode", "app-caches", "logs", "downloads", "ios-backups"]
+    public static let ids = ["android-sdk", "android-avd", "ios-simulators", "xcode", "project-artifacts", "js-packages", "gradle-maven", "docker", "homebrew", "node-versions", "claude-desktop", "vscode", "app-caches", "logs", "downloads", "ios-backups", "whatsapp"]
 
     /// Recalcula un solo perfil (para revalidar un plan antes de actuar).
     public static func profile(_ id: String, _ env: DevEnvironment) -> ProfileResult? {
@@ -29,6 +29,7 @@ public enum DevProfiles {
         case "logs": return logs(env)
         case "downloads": return downloads(env)
         case "ios-backups": return iosBackups(env)
+        case "whatsapp": return whatsapp(env)
         default: return nil
         }
     }
@@ -42,7 +43,7 @@ public enum DevProfiles {
             { androidSDK(env, index) }, { androidEmulators(env) }, { iosSimulators(env) }, { xcode(env) },
             { projectArtifacts(env, index) }, { jsPackages(env) }, { gradleMaven(env, index) }, { docker(env) },
             { homebrew(env) }, { nodeVersions(env) }, { claudeDesktop(env) }, { vscode(env) },
-            { appCaches(env) }, { logs(env) }, { downloads(env) }, { iosBackups(env) }
+            { appCaches(env) }, { logs(env) }, { downloads(env) }, { iosBackups(env) }, { whatsapp(env) }
         ]
         // Los perfiles son independientes y casi todo es E/S: se miden en paralelo, conservando el orden.
         let box = ResultBox(count: builders.count)

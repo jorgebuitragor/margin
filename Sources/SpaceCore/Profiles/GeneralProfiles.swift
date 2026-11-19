@@ -3,7 +3,7 @@ import Foundation
 /// Perfiles generales del «Análisis inteligente»: lugares conocidos donde se acumula espacio en cualquier Mac,
 /// no solo en uno de desarrollo. Igual que los perfiles de desarrollo: miden, explican y proponen; no ejecutan.
 extension DevProfiles {
-    public static let generalIDs: Set<String> = ["app-caches", "logs", "downloads", "ios-backups"]
+    public static let generalIDs: Set<String> = ["app-caches", "logs", "downloads", "ios-backups", "whatsapp"]
 
     /// Cachés con dueño conocido: título, proceso que debe estar cerrado y comando oficial si existe.
     static var knownCaches: [String: (title: String, check: ProcessCheck?, command: [String]?)] { [
@@ -100,6 +100,30 @@ extension DevProfiles {
                 regenerate: loc("Se pueden volver a descargar si sigue disponible el original.", "They can be downloaded again if the original is still available."),
                 action: .trash(paths, label: loc("\(paths.count) archivos de Descargas", "\(paths.count) files in Downloads"))))
         }
+        return result
+    }
+
+    /// WhatsApp para Mac guarda los chats y lo que descarga de ellos (fotos, vídeos, notas de voz, documentos) en su
+    /// contenedor compartido. Puede ocupar decenas de GB, pero no se toca desde fuera: WhatsApp lleva en su base de datos
+    /// qué archivos tiene y borrarlos a mano rompe los chats. Se mide y se indica dónde gestionarlo dentro de WhatsApp.
+    static func whatsapp(_ env: DevEnvironment) -> ProfileResult {
+        let dir = env.path("Library/Group Containers/group.net.whatsapp.WhatsApp.shared")
+        var result = ProfileResult(id: "whatsapp", name: "WhatsApp", owner: "WhatsApp", detected: env.exists(dir))
+        guard result.detected else { return result }
+        guard (try? FileManager.default.contentsOfDirectory(atPath: dir)) != nil else {
+            result.notes.append(loc("macOS no deja medir los chats de WhatsApp sin «Acceso total al disco». Puedes ver cuánto ocupan en WhatsApp › Ajustes › Almacenamiento.", "macOS doesn't allow measuring WhatsApp chats without “Full Disk Access”. You can see how much they take in WhatsApp › Settings › Storage."))
+            return result
+        }
+        let usage = DiskUsage.measure(dir)
+        guard usage.allocated > 500_000_000 else { return result }
+        let action = DevAction(kind: .manual,
+                               command: loc("En WhatsApp: Ajustes › Almacenamiento › Administrar almacenamiento", "In WhatsApp: Settings › Storage › Manage storage"),
+                               preview: nil,
+                               note: loc("Para que no vuelva a crecer, desactiva la descarga automática de vídeos y documentos en Ajustes › Almacenamiento.", "To keep it from growing again, turn off automatic download of videos and documents in Settings › Storage."))
+        result.items.append(.measured("whatsapp", loc("Chats y archivos de WhatsApp", "WhatsApp chats and files"), path: dir, category: .review,
+            reason: loc("Fotos, vídeos, notas de voz y documentos de tus chats, que WhatsApp descarga solo. Desde fuera no se pueden borrar sin romper los chats: se gestiona dentro de WhatsApp, que muestra los archivos más grandes y lo que ocupa cada chat.", "Photos, videos, voice notes and documents from your chats, which WhatsApp downloads automatically. They can't be deleted from outside without breaking the chats: manage them inside WhatsApp, which shows the largest files and how much each chat takes."),
+            regenerate: loc("Lo que borres en WhatsApp desaparece de ese chat en este Mac; sigue en el teléfono si no lo borraste allí.", "What you delete in WhatsApp disappears from that chat on this Mac; it stays on your phone unless you delete it there too."),
+            action: action, usage: usage))
         return result
     }
 

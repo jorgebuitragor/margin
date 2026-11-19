@@ -58,11 +58,12 @@ extension ContentView {
                         .frame(width: max(rect.width - 3, 0), height: max(rect.height - 3, 0))
                         .offset(x: rect.minX + 1.5, y: rect.minY + 1.5)
                         .transition(.scale(scale: 0.9).combined(with: .opacity))
-                        .help("\(isRest ? t("Archivos sueltos y carpetas pequeñas") : folder.path) · \(size(folder.allocatedBytes))\(folder.reason.map { " · " + $0 } ?? "")\(!isRest && !canEnter && folder.protection == nil ? " · " + t("Este análisis no tiene más detalle: clic derecho › «Analizar esta carpeta».") : "")")
+                        .help("\(isRest ? t("Archivos sueltos y carpetas pequeñas") : folder.path) · \(size(folder.allocatedBytes))\(folder.reason.map { " · " + $0 } ?? "")\(!isRest && !canEnter ? " · " + t("Este análisis no tiene más detalle: clic derecho › «Analizar esta carpeta».") : "")")
                         .contextMenu {
                             if !isRest {
                                 Button(t("Mostrar en Finder")) { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: folder.path)]) }
-                                if folder.protection == nil { Button(t("Analizar esta carpeta")) { model.scan(URL(fileURLWithPath: folder.path)) } }
+                                // También las protegidas: se analizan en modo «solo medir».
+                                Button(t("Analizar esta carpeta")) { model.scan(URL(fileURLWithPath: folder.path)) }
                             }
                         }
                         .accessibilityLabel("\(isRest ? t("Otros") : folder.name), \(size(folder.allocatedBytes))\(folder.protection == "protected" ? ", " + t("protegida") : folder.protection == "sync" ? ", " + t("sincronizada") : "")\(canEnter ? ", " + t("se puede abrir") : "")")
@@ -83,6 +84,11 @@ extension ContentView {
                 HStack(spacing: 14) {
                     availableMetric
                     metric(t("Total de la carpeta analizada"), model.report.map { size($0.totalAllocated) } ?? "—", "folder")
+                        .help(model.report.flatMap { report in report.totalFreeable.map { t("Se liberaría como mínimo %@ al borrarla: el resto son datos que comparte con clones (copias que macOS hace sin duplicar) o archivos con otros enlaces.", size($0)) } } ?? "")
+                    if let report = model.report, let freeable = report.totalFreeable, sharesALot(freeable, of: report.totalAllocated) {
+                        metric(t("Se liberaría al borrarla"), t("al menos %@", size(freeable)), "arrow.uturn.down", tint: palette.warning)
+                            .help(t("Lo que ocupa de verdad: el resto son datos compartidos con clones (copias que macOS hace sin duplicar datos) u otros enlaces, que no se liberan al borrar solo esta carpeta."))
+                    }
                     metric(t("Archivos revisados"), "\(model.report?.visited ?? 0)", "doc.on.doc")
                 }
             }
@@ -102,11 +108,15 @@ extension ContentView {
                             Text(folder.name).lineLimit(1).help(folder.path)
                             Spacer()
                             ProgressView(value: Double(folder.allocatedBytes), total: Double(total)).frame(width: 120)
+                            if let freeable = folder.freeableBytes, sharesALot(freeable, of: folder.allocatedBytes) {
+                                Text(t("libera ≥ %@", size(freeable))).font(.caption).monospacedDigit().foregroundStyle(palette.warning)
+                                    .help(t("Al borrarla se liberaría como mínimo esto: el resto son datos compartidos con clones u otros enlaces."))
+                            }
                             Text(size(folder.allocatedBytes) + (folder.partial ? "+" : "")).monospacedDigit().frame(width: 90, alignment: .trailing)
                         }
                         .contextMenu {
                             Button(t("Mostrar en Finder")) { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: folder.path)]) }
-                            Button(t("Analizar esta carpeta")) { model.scan(URL(fileURLWithPath: folder.path)) }.disabled(folder.protection != nil)
+                            Button(t("Analizar esta carpeta")) { model.scan(URL(fileURLWithPath: folder.path)) }
                         }
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel("\(folder.name), \(size(folder.allocatedBytes))\(folder.protection == "sync" ? ", " + t("sincronizada") : folder.protection == "protected" ? ", " + t("protegida") : "")")
@@ -417,4 +427,9 @@ struct MemoryBar: View {
         .onAppear { if reduceMotion { shown = true } else { withAnimation(.spring(response: 0.7, dampingFraction: 0.85).delay(0.1 + delay)) { shown = true } } }
         .accessibilityHidden(true)
     }
+}
+
+/// Lo liberable es mucho menor que lo que ocupa (menos del 80 % y al menos 50 MB de diferencia): conviene mostrarlo.
+func sharesALot(_ freeable: Int64, of allocated: Int64) -> Bool {
+    allocated - freeable >= 50_000_000 && Double(freeable) < Double(allocated) * 0.8
 }

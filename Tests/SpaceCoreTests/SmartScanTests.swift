@@ -94,6 +94,16 @@ final class SmartScanTests: XCTestCase {
         XCTAssertEqual(failed.status, .failed)
     }
 
+    func testWhatsAppIsMeasuredButOnlyManagedFromWhatsApp() throws {
+        try file("Library/Group Containers/group.net.whatsapp.WhatsApp.shared/Message/Media/x.mp4", 600_000_000)
+        let profile = try XCTUnwrap(DevProfiles.profile("whatsapp", env()))
+        let item = try XCTUnwrap(profile.items.first)
+        XCTAssertEqual(item.category, .review)
+        XCTAssertEqual(item.action?.kind, .manual, "Se gestiona dentro de WhatsApp")
+        XCTAssertFalse(item.canDelete, "Nunca entra en un plan")
+        XCTAssertGreaterThan(item.bytes ?? 0, 500_000_000)
+    }
+
     func testRealTrashIsNeverEmptiedFromATestHome() {
         // Con el ejecutor real y una carpeta personal sintética, no se llega a pedir nada a Finder.
         let result = TrashEmptier.empty(env: env(), executor: SystemExecutor())

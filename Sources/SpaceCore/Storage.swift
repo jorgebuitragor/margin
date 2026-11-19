@@ -70,12 +70,23 @@ public enum StorageAnalyzer {
             let path = env.path(name)
             switch name {
             case "Library":
-                for child in ((try? fm.contentsOfDirectory(atPath: path)) ?? []).sorted() where !skippedInLibrary.contains(child) {
+                // Los contenedores de otras apps (WhatsApp, Office…) pueden ser lo que más ocupa. Sin «Acceso total al
+                // disco», leerlos haría que macOS pidiera permiso app por app, así que solo se miden si ya hay acceso.
+                let fullAccess = (try? fm.contentsOfDirectory(atPath: env.path(".Trash"))) != nil
+                for child in ((try? fm.contentsOfDirectory(atPath: path)) ?? []).sorted() where fullAccess || !skippedInLibrary.contains(child) {
                     if child == "Mobile Documents" {
                         // iCloud Drive son documentos tuyos; su Papelera (lo borrado de iCloud Drive) cuenta como Papelera.
                         let mobile = "\(path)/\(child)"
                         for entry in ((try? fm.contentsOfDirectory(atPath: mobile)) ?? []).sorted() {
                             jobs.append(("\(mobile)/\(entry)", entry == ".Trash" ? .trash : .personal))
+                        }
+                        continue
+                    }
+                    if child == "Containers" {
+                        // Docker va aparte, como desarrollo: el resto de contenedores, uno por uno, como datos de apps.
+                        let containers = "\(path)/\(child)"
+                        for entry in ((try? fm.contentsOfDirectory(atPath: containers)) ?? []).sorted() where entry != "com.docker.docker" {
+                            jobs.append(("\(containers)/\(entry)", .appData))
                         }
                         continue
                     }
@@ -116,7 +127,7 @@ public enum StorageAnalyzer {
         }
         for (index, job) in list.enumerated() {
             let usage = box.results[index] ?? Usage()
-            bytes[job.kind, default: 0] += usage.allocated
+            bytes[job.kind, default: 0] += usage.unique
             if usage.partial { partial.insert(job.kind) }
         }
         return build(capacity: capacity, measured: bytes, partial: partial)
