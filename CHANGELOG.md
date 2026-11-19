@@ -6,6 +6,11 @@ Cada versión publicada en [GitHub Releases](https://github.com/jorgebuitragor/m
 
 - La Papelera aparece en la barra del disco de Inicio con su tamaño y su porcentaje en cuanto tiene algo, y desaparece al vaciarla, sin esperar a volver a medir el disco (necesita acceso total al disco).
 - Con la Papelera vacía, el botón de Inicio dice «Papelera vacía».
+- Limpieza, rehecha para poder revisar:
+  - Filtro Todo / Sin riesgo / Para revisar.
+  - La lista a la izquierda y un panel de detalle fijo a la derecha: qué es, por qué revisarlo, qué pasa si lo quitas, dónde está (con «Mostrar en Finder»), cómo se quitaría y un botón para incluirlo en el plan.
+  - Un clic en la fila la selecciona; la casilla solo la incluye en el plan. Antes, toda la fila era la casilla y el detalle no se podía abrir.
+  - Las tarjetas «Recuperable sin riesgo» y «Para revisar» de Inicio llevan a Limpieza ya filtrada.
 
 ## 0.10.1
 

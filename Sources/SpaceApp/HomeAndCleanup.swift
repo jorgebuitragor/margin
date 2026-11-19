@@ -32,8 +32,11 @@ extension ContentView {
                     GlassEffectContainer(spacing: 14) {
                         VStack(spacing: 14) {
                             HStack(spacing: 14) {
-                                metric(t("Recuperable sin riesgo"), size(report.lowRiskBytes), "checkmark.circle", tint: accent)
-                                metric(t("Para revisar"), size(report.reviewBytes), "eye", tint: palette.warning)
+                                // Las dos cifras llevan a Limpieza ya filtrada, para ver qué hay detrás de cada una.
+                                Button { devFilter = "bajo"; tab = "Limpieza" } label: { metric(t("Recuperable sin riesgo"), size(report.lowRiskBytes), "checkmark.circle", tint: accent) }
+                                    .buttonStyle(.plain).help(t("Ver en Limpieza lo que se puede quitar sin riesgo"))
+                                Button { devFilter = "revisar"; tab = "Limpieza" } label: { metric(t("Para revisar"), size(report.reviewBytes), "eye", tint: palette.warning) }
+                                    .buttonStyle(.plain).help(t("Ver en Limpieza lo que conviene revisar uno por uno"))
                             }
                             LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 14) {
                                 ForEach(Array(Self.groups.enumerated()), id: \.element.title) { index, group in
@@ -147,8 +150,12 @@ extension ContentView {
         return VStack(alignment: .leading, spacing: 14) {
             GlassEffectContainer(spacing: 14) {
                 HStack(spacing: 14) {
-                    metric(t("Bajo riesgo · recuperable estimado"), model.dev.map { size($0.lowRiskBytes) } ?? "—", "checkmark.circle", tint: model.dev == nil ? nil : accent)
-                    metric(t("Para revisar"), model.dev.map { size($0.reviewBytes) } ?? "—", "eye", tint: model.dev == nil ? nil : palette.warning)
+                    Button { withAnimation(.smooth) { devFilter = devFilter == "bajo" ? "todo" : "bajo" } } label: {
+                        metric(t("Bajo riesgo · recuperable estimado"), model.dev.map { size($0.lowRiskBytes) } ?? "—", "checkmark.circle", tint: model.dev == nil ? nil : accent)
+                    }.buttonStyle(.plain).help(t("Mostrar solo lo de bajo riesgo"))
+                    Button { withAnimation(.smooth) { devFilter = devFilter == "revisar" ? "todo" : "revisar" } } label: {
+                        metric(t("Para revisar"), model.dev.map { size($0.reviewBytes) } ?? "—", "eye", tint: model.dev == nil ? nil : palette.warning)
+                    }.buttonStyle(.plain).help(t("Mostrar solo lo que conviene revisar"))
                     availableMetric
                 }
             }
@@ -159,62 +166,36 @@ extension ContentView {
                     .transition(.opacity)
             }
             if model.dev != nil {
-                List(selection: $devSelection) {
-                    ForEach(items) { profile in
-                        Section("\(profile.name) · \(profile.owner)") {
-                            ForEach(profile.items) { item in
-                                HStack(spacing: 10) {
-                                    Toggle("", isOn: Binding(get: { devChecked.contains(item.id) }, set: { on in withAnimation(.smooth) { if on { devChecked.insert(item.id) } else { devChecked.remove(item.id) } } }))
-                                        .toggleStyle(.checkbox).labelsHidden().disabled(!item.canDelete)
-                                        .accessibilityLabel(t("Incluir %@ en el plan", item.title))
-                                    Image(systemName: item.category == .lowRisk ? "checkmark.circle.fill" : item.category == .review ? "eye.fill" : "lock.fill")
-                                        .foregroundStyle(item.category == .lowRisk ? accent : item.category == .review ? palette.warning : .secondary)
-                                    Text(item.title).lineLimit(1)
-                                    Spacer()
-                                    Text(t(item.category.rawValue)).font(.caption).foregroundStyle(.secondary)
-                                    Text(size(item.recoverable ?? item.bytes)).monospacedDigit().frame(width: 90, alignment: .trailing)
-                                }
-                                .tag(item.id)
-                                .accessibilityElement(children: .combine)
-                            }
-                            ForEach(profile.notes, id: \.self) { Text($0).font(.caption).foregroundStyle(.secondary) }
-                        }
-                    }
+                // Filtro: así «Para revisar» se puede recorrer sin buscarlo entre todo lo demás.
+                Picker(t("Mostrar"), selection: $devFilter.animation(.smooth)) {
+                    Text(t("Todo")).tag("todo")
+                    Text(t("Sin riesgo")).tag("bajo")
+                    Text(t("Para revisar")).tag("revisar")
                 }
-                .scrollContentBackground(.hidden)
-                .frame(minHeight: 240)
-                .surface(cornerRadius: 20, highContrast: highContrast)
-                if let item = items.flatMap(\.items).first(where: { $0.id == devSelection }) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text(item.title).font(.headline)
-                            Spacer()
-                            if let path = item.path, FileManager.default.fileExists(atPath: path) {
-                                Button(t("Mostrar en Finder"), systemImage: "folder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }
-                            }
-                        }
-                        Text(item.reason)
-                        Text(t("Si se retira: %@", item.regenerate)).foregroundStyle(.secondary)
-                        Text(t("Ocupa %@ · recuperable estimado %@", size(item.bytes), size(item.recoverable))).font(.caption)
-                        if let action = item.action {
-                            HStack {
-                                Text(action.command).font(.system(.callout, design: .monospaced)).textSelection(.enabled)
-                                Spacer()
-                                Button(t("Copiar"), systemImage: "doc.on.doc") {
-                                    NSPasteboard.general.clearContents()
-                                    NSPasteboard.general.setString(action.kind == .command ? action.command : (item.path ?? ""), forType: .string)
+                .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 420)
+                let visible = filteredProfiles(items)
+                // Lista a la izquierda y detalle fijo a la derecha, como en Apps: un clic en la fila la selecciona y el
+                // detalle explica por qué revisarla; la casilla solo la incluye en el plan.
+                HStack(alignment: .top, spacing: 14) {
+                    List(selection: $devSelection) {
+                        ForEach(visible) { profile in
+                            Section("\(profile.name) · \(profile.owner)") {
+                                ForEach(profile.items) { item in devRow(item).tag(item.id) }
+                                if devFilter == "todo" {
+                                    ForEach(profile.notes, id: \.self) { Text($0).font(.caption).foregroundStyle(.secondary) }
                                 }
                             }
-                            if let preview = action.preview { Text(t("Vista previa: %@", preview)).font(.caption).textSelection(.enabled) }
-                            if let note = action.note { Text(note).font(.caption).foregroundStyle(palette.warning) }
                         }
                     }
-                    .padding(16)
-                    .surface(tint: accent.opacity(0.1), highContrast: highContrast)
-                    .id(item.id)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    .scrollContentBackground(.hidden)
+                    .frame(minWidth: 380, maxWidth: .infinity, minHeight: 240)
+                    .surface(cornerRadius: 20, highContrast: highContrast)
+                    devDetail(visible.flatMap(\.items).first { $0.id == devSelection })
+                        .frame(width: 360)
                 }
-                Text(t("Marca elementos y revisa el plan antes de ejecutar. «Recuperable estimado» excluye archivos con enlaces duros compartidos."))
+                .onAppear { selectFirstIfNeeded(visible) }
+                .onChange(of: devFilter) { selectFirstIfNeeded(filteredProfiles(items)) }
+                Text(t("Haz clic en un elemento para ver qué es y por qué revisarlo; la casilla lo incluye en el plan. «Recuperable estimado» excluye archivos con enlaces duros compartidos."))
                     .font(.caption).foregroundStyle(.secondary)
             } else if !model.devBusy {
                 ContentUnavailableView {
@@ -244,5 +225,111 @@ extension ContentView {
             }
         }
         .animation(.smooth(duration: 0.35), value: checked.isEmpty)
+    }
+
+    /// Perfiles con solo los elementos del filtro elegido (los vacíos se ocultan).
+    func filteredProfiles(_ profiles: [ProfileResult]) -> [ProfileResult] {
+        guard devFilter != "todo" else { return profiles }
+        let category: SpaceCore.Category = devFilter == "bajo" ? .lowRisk : .review
+        return profiles.compactMap { profile in
+            var copy = profile
+            copy.items = profile.items.filter { $0.category == category }
+            return copy.items.isEmpty ? nil : copy
+        }
+    }
+
+    /// Si no hay nada seleccionado (o lo seleccionado quedó fuera del filtro), se muestra el primero.
+    func selectFirstIfNeeded(_ profiles: [ProfileResult]) {
+        let ids = profiles.flatMap(\.items).map(\.id)
+        if devSelection == nil || !ids.contains(devSelection!) { devSelection = ids.first }
+    }
+
+    func devRow(_ item: DevItem) -> some View {
+        HStack(spacing: 10) {
+            Toggle("", isOn: Binding(get: { devChecked.contains(item.id) }, set: { on in withAnimation(.smooth) { if on { devChecked.insert(item.id) } else { devChecked.remove(item.id) } } }))
+                .toggleStyle(.checkbox).labelsHidden().disabled(!item.canDelete)
+                .accessibilityLabel(t("Incluir %@ en el plan", item.title))
+            Image(systemName: categoryIcon(item.category)).foregroundStyle(categoryColor(item.category))
+                .accessibilityHidden(true)
+            Text(item.title).lineLimit(1)
+            Spacer()
+            Text(size(item.recoverable ?? item.bytes)).monospacedDigit().frame(width: 80, alignment: .trailing)
+        }
+        .contentShape(Rectangle())
+        .help(t(item.category.rawValue))
+    }
+
+    func categoryIcon(_ category: SpaceCore.Category) -> String {
+        category == .lowRisk ? "checkmark.circle.fill" : category == .review ? "eye.fill" : "lock.fill"
+    }
+
+    func categoryColor(_ category: SpaceCore.Category) -> Color {
+        category == .lowRisk ? accent : category == .review ? palette.warning : .secondary
+    }
+
+    /// Panel de detalle de Limpieza: qué es, por qué revisarlo, qué pasa si se quita y cómo se quitaría.
+    @ViewBuilder
+    func devDetail(_ item: DevItem?) -> some View {
+        if let item {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(item.title).font(.headline).fixedSize(horizontal: false, vertical: true)
+                    Label(t(item.category.rawValue), systemImage: categoryIcon(item.category))
+                        .font(.callout.weight(.medium)).foregroundStyle(categoryColor(item.category))
+                    Text(size(item.recoverable ?? item.bytes)).font(.title2.weight(.semibold)).monospacedDigit()
+                    if item.recoverable != nil, item.recoverable != item.bytes {
+                        Text(t("Ocupa %@ · recuperable estimado %@", size(item.bytes), size(item.recoverable))).font(.caption).foregroundStyle(.secondary)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(item.category == .review ? t("Por qué revisarlo") : item.category == .lowRisk ? t("Por qué sobra") : t("Por qué se conserva")).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                        Text(item.reason).fixedSize(horizontal: false, vertical: true)
+                    }
+                    if !item.regenerate.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(t("Si lo quitas")).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                            Text(item.regenerate).fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    if let used = item.lastUsed {
+                        Text(t("Último cambio: %@", used.formatted(.relative(presentation: .named).locale(Localizer.locale)))).font(.caption).foregroundStyle(.secondary)
+                    }
+                    if let path = item.path {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(path.replacingOccurrences(of: displayHome, with: "~")).font(.system(.caption, design: .monospaced))
+                                .textSelection(.enabled).lineLimit(3).truncationMode(.middle)
+                            if FileManager.default.fileExists(atPath: path) {
+                                Button(t("Mostrar en Finder"), systemImage: "folder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }
+                                    .buttonStyle(.link).font(.callout)
+                            }
+                        }
+                    }
+                    if let action = item.action {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(action.kind == .command ? t("Cómo se quitaría (comando oficial)") : t("Cómo se quitaría")).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                            Text(action.command.replacingOccurrences(of: displayHome, with: "~")).font(.system(.caption, design: .monospaced)).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                            if let preview = action.preview { Text(t("Vista previa: %@", preview)).font(.caption).textSelection(.enabled) }
+                            if let note = action.note { Text(note).font(.caption).foregroundStyle(palette.warning) }
+                        }
+                    }
+                    if item.canDelete {
+                        let included = devChecked.contains(item.id)
+                        Button(included ? t("Quitar del plan") : t("Incluir en el plan"), systemImage: included ? "minus.circle" : "plus.circle") {
+                            withAnimation(.smooth) { if included { devChecked.remove(item.id) } else { devChecked.insert(item.id) } }
+                        }
+                        .buttonStyle(.glass).controlSize(.large)
+                    } else {
+                        Text(t("Margin no lo propone: se mide, pero no se puede incluir en un plan.")).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+            }
+            .surface(cornerRadius: 20, highContrast: highContrast)
+            .id(item.id)
+        } else {
+            ContentUnavailableView(t("Elige un elemento"), systemImage: "hand.point.left", description: Text(t("Verás qué es, por qué revisarlo y qué pasa si lo quitas.")))
+                .frame(maxWidth: .infinity, minHeight: 240)
+                .surface(cornerRadius: 20, highContrast: highContrast)
+        }
     }
 }

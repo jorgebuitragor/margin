@@ -17,6 +17,8 @@ struct ContentView: View {
     @State var folderView = DevEnvironment.testSetting("VIEW") ?? "Lista"
     @State var mapRoot: String?
     @State var devSelection: String?
+    /// Filtro de Limpieza: «todo», «bajo» (sin riesgo) o «revisar».
+    @State var devFilter = "todo"
     @State var hoveredTile: String?
     @State var appSelection: String?
     @State var appChecked = Set<String>()

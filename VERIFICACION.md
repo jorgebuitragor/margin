@@ -428,3 +428,14 @@ Hechas con clics sobre una carpeta personal sintética, sin ejecutar ningún pla
   - la leyenda mostró «Papelera 320,5 MB · 0,1 %» con «Vaciar…», el botón «Vaciar Papelera (320,5 MB)…» y la tarjeta «1 elemento»;
   - después se quitó ese archivo con `rm` (solo ese) y la Papelera quedó vacía como estaba. No se vació la Papelera.
 - Con la Papelera vacía, el botón de Inicio dice «Papelera vacía» en lugar de «Vaciar Papelera (0 bytes)…».
+
+## Limpieza con filtro y detalle (18-11-2026)
+
+- **Problema**: «Para revisar» (13 elementos, 28 GB en el Mac de Jorge, todos accionables) no se podía revisar.
+  - La tarjeta de Inicio no hacía nada.
+  - En Limpieza, toda la fila era la casilla (elemento de accesibilidad de 840 puntos), así que un clic la marcaba en vez de abrir el detalle. Además, el detalle salía debajo de una lista que ocupaba toda la ventana.
+- **Ahora**: filtro Todo / Sin riesgo / Para revisar, con la lista y el detalle lado a lado.
+- **Comprobado con clics**:
+  - En Inicio, las dos tarjetas son botones. «Para revisar» abre Limpieza filtrada, con el primer elemento (NDK 25) seleccionado y su detalle: por qué revisarlo, qué pasa si lo quitas, último cambio, ruta con «Mostrar en Finder», comando oficial e «Incluir en el plan».
+  - Un clic en el texto de «Máquina virtual de Claude» la seleccionó sin marcarla y mostró su detalle (10,85 GB, «Con Claude cerrado.»).
+  - Las casillas son ahora controles propios de 16×16. No se creó ningún plan.
