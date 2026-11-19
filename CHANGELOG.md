@@ -2,7 +2,7 @@
 
 Cada versión publicada en [GitHub Releases](https://github.com/jorgebuitragor/margin/releases). Las anteriores a la 0.10 eran solo locales: su detalle está en [PLAN.md](PLAN.md) y [VERIFICACION.md](VERIFICACION.md).
 
-## Sin publicar
+## 0.10.4
 
 - Las carpetas protegidas (la Biblioteca, datos de apps…) se pueden analizar en modo «solo medir»: se ve qué ocupa cada subcarpeta, sin listar archivos ni proponer nada. Antes, Margin se negaba a analizarlas. También desde el árbol y el mapa (clic derecho › Analizar esta carpeta).
 - Margin mide el espacio real: en APFS, las copias que macOS hace sin duplicar datos («clones») ya no cuentan como espacio propio.
