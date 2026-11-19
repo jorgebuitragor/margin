@@ -34,7 +34,7 @@ public final class MCPServer {
             return reply(id, [
                 "protocolVersion": requested ?? Self.protocolVersion,
                 "capabilities": ["tools": ["listChanged": false]],
-                "serverInfo": ["name": "margin", "version": "0.7.0"],
+                "serverInfo": ["name": "margin", "version": MarginVersion.current],
                 "instructions": "Mide el disco y propone limpiezas seguras. Ninguna herramienta borra ni ejecuta nada: propose_cleanup crea un plan y el usuario lo aplica en su terminal con `margin apply <id>`. No intentes aplicarlo tú."
             ])
         case "ping":

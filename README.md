@@ -96,7 +96,46 @@ margin plan <id> <id>        # crea un plan; no ejecuta nada
 margin apply <plan>          # lo revisa otra vez y pide escribir el código del plan
 ```
 
-`margin apply` solo funciona en una terminal interactiva: un agente puede crear planes, pero no aplicarlos. Para conectar Margin con Claude Code o Codex: `bash scripts/install-agentes.sh`.
+`margin apply` solo funciona en una terminal interactiva: un agente puede crear planes, pero no aplicarlos.
+
+## Con Claude Code, Codex u otros agentes (MCP)
+
+Margin incluye un servidor [MCP](https://modelcontextprotocol.io) para que un asistente mida tu disco y te proponga qué limpiar. Las herramientas son estas:
+
+| Herramienta | Qué hace |
+| --- | --- |
+| `disk_status` | Espacio total y disponible, y el reparto por categorías. |
+| `scan_folder` | Analiza una carpeta: lo que más ocupa, con su clasificación. |
+| `dev_report` | Lo que se puede liberar: cachés, registros, instaladores viejos y herramientas de desarrollo. |
+| `apps_report` | Las apps con sus restos y los restos de apps ya borradas. |
+| `propose_cleanup` | Crea un plan con lo que elijas y devuelve el comando para aplicarlo. |
+| `plan_result` | El resultado de un plan que ya aplicaste. |
+
+**Ninguna herramienta borra nada.** El agente propone un plan; tú lo revisas y lo aplicas con `margin apply <plan>` en tu terminal, escribiendo su código. Vaciar la Papelera y el borrado definitivo tampoco están al alcance del agente.
+
+Para conectarlo, si instalaste Margin desde el `.dmg` en Aplicaciones:
+
+```bash
+claude mcp add --scope user margin -- /Applications/Margin.app/Contents/Helpers/margin mcp
+```
+
+```bash
+codex mcp add margin -- /Applications/Margin.app/Contents/Helpers/margin mcp
+```
+
+En otros clientes MCP, la configuración es esta:
+
+```json
+{ "mcpServers": { "margin": { "command": "/Applications/Margin.app/Contents/Helpers/margin", "args": ["mcp"] } } }
+```
+
+Opcional: la skill `liberar-espacio` le enseña a Claude Code el flujo completo (medir, presentar por categorías, preguntar qué incluir, crear el plan y revisar el resultado):
+
+```bash
+mkdir -p ~/.claude/skills/liberar-espacio && curl -fsSL https://raw.githubusercontent.com/jorgebuitragor/margin/main/integraciones/claude-code/liberar-espacio/SKILL.md -o ~/.claude/skills/liberar-espacio/SKILL.md
+```
+
+Si compilaste Margin desde el código, `bash scripts/install-agentes.sh` hace todo esto de una vez (Claude Code y, si lo tienes, Codex). Los informes incluyen rutas de tu Mac y pasan a la conversación con el asistente: comparte solo lo que necesites.
 
 ## Más información
 
