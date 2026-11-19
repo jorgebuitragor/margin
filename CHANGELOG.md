@@ -2,7 +2,7 @@
 
 Cada versión publicada en [GitHub Releases](https://github.com/jorgebuitragor/margin/releases). Las anteriores a la 0.10 eran solo locales: su detalle está en [PLAN.md](PLAN.md) y [VERIFICACION.md](VERIFICACION.md).
 
-## Sin publicar
+## 0.10.5
 
 - El tamaño de una carpeta con clones es el espacio real: las copias idénticas cuentan una sola vez en el árbol de Carpetas, en el total de la carpeta analizada y en la barra del disco. En la 0.10.4 solo «libera ≥ X» lo tenía en cuenta, y la carpeta de WhatsApp seguía marcando 131 GB.
 
