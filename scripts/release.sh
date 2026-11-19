@@ -47,7 +47,21 @@ mv dist/Margin.zip "$zip"
 bash scripts/make-dmg.sh "${TMPDIR:-/tmp}/margin-local/Margin.app" dist/Margin.dmg
 signature="$("$tools/bin/sign_update" "$zip")"   # sparkle:edSignature="…" length="…"
 build="$(git rev-list --count HEAD)"
-html="$(printf '%s\n' "$notes" | sed -E 's/^- (.*)$/<li>\1<\/li>/' | grep '<li>' || true)"
+# Notas en HTML para la ventana de Sparkle: «- » es un punto y «  - » un subpunto de la lista anterior.
+html="$(printf '%s\n' "$notes" | python3 -I -c '
+import html, re, sys
+out, sub = [], False
+for line in sys.stdin.read().splitlines():
+    m = re.match(r"^(\s*)- (.*)$", line)
+    if not m: continue
+    text = re.sub(r"`([^`]+)`", r"<code>\1</code>", html.escape(m.group(2)))
+    if m.group(1):
+        if not sub: out.append("<ul>"); sub = True
+    elif sub:
+        out.append("</ul>"); sub = False
+    out.append(f"<li>{text}</li>")
+if sub: out.append("</ul>")
+print("".join(out))')"
 cat > dist/appcast.xml <<XML
 <?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">

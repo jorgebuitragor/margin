@@ -416,3 +416,7 @@ Hechas con clics sobre una carpeta personal sintética, sin ejecutar ningún pla
   - Homebrew 7 exige `brew trust jorgebuitragor/tap` antes de cargar casks de un tap ajeno. No se ejecutó en el Mac de Jorge, así que `brew audit` y la instalación con brew quedaron sin probar.
 - **MCP**: el servidor informa la versión real del Info.plist de la app en vez de «0.7.0».
 - Una ejecución de las pruebas tuvo un fallo intermitente que no se repitió en 8 ejecuciones más; no se identificó la prueba.
+- **Release `v0.10.1`**:
+  - Publicada con `Margin-0.10.1.zip`, `appcast.xml` y `Margin.dmg`. El cask del tap quedó en 0.10.1, con el SHA-256 del nuevo `.dmg`, y el enlace directo del README lleva a la v0.10.1.
+  - La copia de Jorge (36) ofreció la 37 y se actualizó.
+  - Fallo encontrado: la ventana de Sparkle perdía los subpuntos del CHANGELOG, porque `release.sh` solo convertía las líneas «- ». Ahora genera listas anidadas, y el `appcast.xml` de la v0.10.1 se volvió a subir con las notas completas; el ZIP y su firma no cambiaron.
