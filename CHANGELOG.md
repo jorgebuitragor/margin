@@ -4,7 +4,10 @@ Cada versión publicada en [GitHub Releases](https://github.com/jorgebuitragor/m
 
 ## 0.10.1
 
-- Rendimiento gasta mucha menos CPU mientras está abierta: un solo recorrido de procesos para memoria y CPU, sin animar cada actualización, cada 5 segundos y con el idioma de la interfaz en memoria en vez de leerlo en cada texto (antes, 14–23 % de un núcleo).
+- Margin gasta mucha menos CPU:
+  - Rendimiento, mientras está abierta, pasa del 14–23 % de un núcleo a un 5–10 %: un solo recorrido de procesos para memoria y CPU, sin animar cada actualización y cada 5 segundos.
+  - El idioma de la interfaz se guarda en memoria en vez de leerse en cada texto.
+  - En Inicio, el icono del análisis inteligente ya no se anima sin fin: Inicio pasa del 8,8 % al 2 %.
 - Se puede instalar con Homebrew: `brew trust jorgebuitragor/tap` y `brew install --cask jorgebuitragor/tap/margin`.
 - Descarga directa en `.dmg` desde el README.
 - El servidor MCP informa la versión real de Margin.

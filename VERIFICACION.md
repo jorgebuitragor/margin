@@ -399,3 +399,20 @@ Hechas con clics sobre una carpeta personal sintética, sin ejecutar ningún pla
   - Para la v0.10.0 se hizo a partir de la app del ZIP publicado (compilación 32), no de una compilación nueva. Montado: contiene Margin.app (firma válida) y Applications.
   - Se subió a la release, y `https://github.com/jorgebuitragor/margin/releases/latest/download/Margin.dmg` descarga ese mismo archivo, byte a byte (4.055.148 bytes).
   - `release.sh` lo crea y lo sube en cada versión.
+
+## 0.10.1: CPU de Margin, Homebrew y versión del MCP (18-11-2026)
+
+- **CPU**, medida con el tiempo de CPU consumido en 30–60 s (`ps -o time`), más fiable que el % de `top` con el Mac cargado (la carga llegó a 250 por una compilación ajena):
+  - Rendimiento abierto: del 14–23 % de un núcleo al 5–10 %.
+  - Inicio a la vista: del 8,8 % al 2,1 %.
+- **Causas, según el perfil (`sample`)**:
+  - `t()` leía el idioma de UserDefaults en cada texto, cientos de veces por dibujo. Ahora queda en memoria y se recalcula antes de dibujar al cambiar de idioma; comprobado en la app: inglés y vuelta a español al instante.
+  - Cada muestra animaba unas 20 barras y las tarjetas de cristal. Ahora las muestras automáticas no se animan y llegan cada 5 s en vez de cada 3.
+  - Memoria y CPU recorrían los procesos dos veces. Ahora es un solo recorrido, con el dueño de cada proceso en caché: 2 ms por muestra (138 ms la primera).
+  - En Inicio, el icono del análisis «respiraba» sin fin y obligaba a redibujar sin parar; ahora respira dos veces.
+  - Lo que queda en Rendimiento es redibujar las tarjetas de cristal en cada muestra.
+- **Homebrew**:
+  - Tap público `jorgebuitragor/homebrew-tap` con el cask `margin` (`.dmg`, `auto_updates`, CLI como `binary`, `zap`). `brew style` sin avisos; la URL y el SHA-256 del cask coinciden con el `.dmg` publicado.
+  - Homebrew 7 exige `brew trust jorgebuitragor/tap` antes de cargar casks de un tap ajeno. No se ejecutó en el Mac de Jorge, así que `brew audit` y la instalación con brew quedaron sin probar.
+- **MCP**: el servidor informa la versión real del Info.plist de la app en vez de «0.7.0».
+- Una ejecución de las pruebas tuvo un fallo intermitente que no se repitió en 8 ejecuciones más; no se identificó la prueba.

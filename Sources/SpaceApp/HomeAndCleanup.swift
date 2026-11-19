@@ -58,7 +58,9 @@ extension ContentView {
                 } else {
                     VStack(spacing: 16) {
                         Image(systemName: "sparkles").font(.system(size: 46)).foregroundStyle(accent.gradient)
-                            .symbolEffect(.breathe, options: .repeat(.continuous))
+                            // Dos respiraciones al aparecer y quieto: repetirla sin fin obligaba a dibujar sin parar
+                            // (unos 8 % de un núcleo con Inicio a la vista).
+                            .symbolEffect(.breathe, options: .repeat(2))
                         Text(t("Análisis inteligente")).font(.title2.bold())
                         Text(t("Revisa en menos de un minuto los lugares donde se acumula espacio: cachés de apps, registros, instaladores viejos, herramientas de desarrollo y la Papelera. No borra nada sin tu confirmación."))
                             .multilineTextAlignment(.center).foregroundStyle(.secondary).frame(maxWidth: 520)
