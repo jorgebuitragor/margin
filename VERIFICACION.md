@@ -389,3 +389,8 @@ Hechas con clics sobre una carpeta personal sintética, sin ejecutar ningún pla
   - La clave EdDSA se creó con `generate_keys` y quedó en el llavero; la pública está en `Resources/sparkle-clave-publica.txt`.
   - El paquete de Swift ya trae `generate_keys` y `sign_update`. La descarga de Sparkle tardó casi una hora por la red, y la release oficial no respondía.
 - **Licencia**: GPL-3.0. `LICENSE` es el texto oficial de la FSF (SHA-256 `3972dc97…`, el de gnu.org).
+- **Primera release y actualización de punta a punta**:
+  - El repositorio pasó a público y `scripts/release.sh` publicó `v0.10.0` con `Margin-0.10.0.zip` (4,1 MB) y `appcast.xml`.
+  - Descargado desde la URL del feed (`releases/latest/download/appcast.xml`), el ZIP coincide con su firma EdDSA (`sign_update --verify`) y la app de dentro está firmada con «Margin Local» (compilación 32).
+  - La copia instalada (compilación 31), con Margin › Buscar actualizaciones…, mostró «Margin 0.10.0 (32) está disponible (tienes la 0.10.0 (31))» con las notas del CHANGELOG. «Instalar actualización» → «Lista para instalarse» → «Instalar y volver a abrir».
+  - Margin volvió a abrirse como compilación 32, con el mismo requisito designado (macOS conserva los permisos), sin marca de cuarentena, y `~/.local/bin/margin` sigue funcionando a través del enlace.
