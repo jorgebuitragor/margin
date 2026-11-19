@@ -80,7 +80,7 @@ brew trust jorgebuitragor/tap
 brew install --cask jorgebuitragor/tap/margin
 ```
 
-Instala Margin en Aplicaciones y el comando `margin`. Las actualizaciones las hace la propia app, así que `brew upgrade` no la toca.
+Instala Margin en Aplicaciones y el comando `margin`. Las actualizaciones las hace la propia app, así que `brew upgrade` no la toca. Como no está notarizada, queda en cuarentena: la app se abre la primera vez con clic derecho › Abrir, y para usar el comando `margin` (o el MCP) hay que quitársela antes, si confías en ella, con `xattr -dr com.apple.quarantine /Applications/Margin.app`. Si macOS avisa de que no se pudo abrir `margin`, pulsa «Aceptar»: «Mover a la Papelera» manda la app entera a la Papelera.
 
 **O compílala** con Xcode y Swift 6 instalados, desde la carpeta del proyecto:
 

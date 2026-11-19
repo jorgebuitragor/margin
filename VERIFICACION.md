@@ -471,3 +471,9 @@ Hechas con clics sobre una carpeta personal sintética, sin ejecutar ningún pla
   - El aviso dice «Se borraron para siempre N elementos (X). Espacio disponible ahora: Y (+Z).» y, si se borraron más de 50 MB que todavía no se notan, que macOS puede tardar unos segundos. La CLI muestra lo mismo.
   - Prueba ampliada: el resultado trae lo que había (83 pruebas, todas bien).
 - No se probó vaciando de verdad: la Papelera real no se vacía en pruebas, y con una carpeta de prueba el vaciado se bloquea.
+- **Aviso del cask sobre la cuarentena** (decisión de Jorge: explicarla en vez de quitarla en silencio):
+  - Al ejecutar `margin` con cuarentena, macOS mostró su aviso. Al pulsar «Mover a la Papelera» (a las 21:55:30, según el registro de syspolicyd), se movió **la app entera**.
+  - Se comprobó que era la copia de prueba (compilación 42, con la cuarentena de Homebrew) y se borró solo esa. La Papelera quedó vacía como estaba y brew, limpio.
+  - Con `xattr -dr com.apple.quarantine /Applications/Margin.app` **antes** de usarlo, `margin status` responde (código 0) y el MCP informa la versión 0.10.2.
+  - El aviso del cask y los dos README dicen ahora: quitar la cuarentena antes de usar el comando y, si sale el aviso de macOS, pulsar «Aceptar», no «Mover a la Papelera». `brew style` sin avisos.
+  - La copia de prueba se desinstaló y la Margin de Jorge se volvió a abrir.
