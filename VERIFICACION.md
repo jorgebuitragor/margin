@@ -439,3 +439,12 @@ Hechas con clics sobre una carpeta personal sintética, sin ejecutar ningún pla
   - En Inicio, las dos tarjetas son botones. «Para revisar» abre Limpieza filtrada, con el primer elemento (NDK 25) seleccionado y su detalle: por qué revisarlo, qué pasa si lo quitas, último cambio, ruta con «Mostrar en Finder», comando oficial e «Incluir en el plan».
   - Un clic en el texto de «Máquina virtual de Claude» la seleccionó sin marcarla y mostró su detalle (10,85 GB, «Con Claude cerrado.»).
   - Las casillas son ahora controles propios de 16×16. No se creó ningún plan.
+
+## Papelera de iCloud Drive (18-11-2026)
+
+- **Problema**: Jorge tenía un elemento en la Papelera y Margin mostraba «Papelera vacía».
+  - Finder contaba 1 elemento, un documento de texto de 44 bytes en `~/Library/Mobile Documents/.Trash`: lo borrado de iCloud Drive va a esa Papelera, no a `~/.Trash`.
+  - Se miró solo la carpeta y el tipo, sin abrir el archivo ni leer su nombre.
+- **Arreglo**: `TrashStatus` suma las dos papeleras, y la medición del disco separa iCloud Drive (documentos) de su Papelera.
+  - Prueba nueva: 83 en total, todas bien.
+  - En la app, la tarjeta pasó a «8 KB · 1 elemento» y el botón, a «Vaciar Papelera (8 KB)…»; la leyenda muestra la Papelera. No se vació nada.

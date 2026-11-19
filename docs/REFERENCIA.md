@@ -34,6 +34,7 @@ Estado: versión 0.10.0 (2026-11-18), publicada en GitHub Releases con actualiza
   - batería por IOKit: carga, capacidad máxima frente a la de fábrica y ciclos (no aparece en Macs de escritorio);
   - lo que ya había: presión de memoria, intercambio, memoria cableada y comprimida, y apps que más memoria usan.
   Se actualiza cada 5 segundos solo mientras la sección está abierta, sin animar cada muestra y con un solo recorrido de procesos para memoria y CPU (unos 2–5 % de un núcleo; antes de optimizarlo, 14–23 %).
+- **Papelera**: suma la de la carpeta personal (`~/.Trash`) y la de iCloud Drive (`~/Library/Mobile Documents/.Trash`), las dos que Finder muestra juntas en este disco. Si la principal no se puede leer (sin acceso total al disco), el tamaño queda como desconocido. En la barra del disco, iCloud Drive cuenta como documentos y su Papelera, como Papelera. Las papeleras de discos externos no se cuentan, porque no ocupan este disco.
 - **Intercambio (swap)** en la barra del disco: el tamaño de los archivos de intercambio (`vm.swapusage`, total). Se relee en vivo y se descuenta de «macOS», que antes lo incluía.
 - **Permisos** (Ajustes):
   - acceso total al disco: macOS no deja pedirlo, así que el botón abre el panel;

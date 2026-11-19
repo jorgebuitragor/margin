@@ -130,10 +130,23 @@ public struct TrashStatus: Codable, Sendable {
     /// nil cuando macOS no deja leerla (sin «Acceso total al disco»).
     public let bytes: Int64?
     public let items: Int?
+    /// Papeleras que Finder muestra juntas en este disco: la de la carpeta personal y la de iCloud Drive (lo que se
+    /// borra de iCloud Drive va a la suya). «Vaciar Papelera» las vacía todas porque lo hace Finder.
+    public static func paths(_ env: DevEnvironment) -> [String] {
+        [env.path(".Trash"), env.path("Library/Mobile Documents/.Trash")]
+    }
+
     public static func read(_ env: DevEnvironment) -> TrashStatus {
-        let path = env.path(".Trash")
-        guard let names = try? FileManager.default.contentsOfDirectory(atPath: path) else { return TrashStatus(bytes: nil, items: nil) }
-        let usage = DiskUsage.measure(path)
-        return TrashStatus(bytes: usage.allocated, items: names.filter { $0 != ".DS_Store" }.count)
+        // Sin «Acceso total al disco» la Papelera principal no se puede leer: el tamaño queda desconocido aunque la de
+        // iCloud sí se pudiera leer, para no dar una cifra incompleta como si fuera la total.
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: env.path(".Trash")) else { return TrashStatus(bytes: nil, items: nil) }
+        var bytes = DiskUsage.measure(env.path(".Trash")).allocated
+        var items = names.filter { $0 != ".DS_Store" }.count
+        let iCloud = env.path("Library/Mobile Documents/.Trash")
+        if let more = try? FileManager.default.contentsOfDirectory(atPath: iCloud) {
+            bytes += DiskUsage.measure(iCloud).allocated
+            items += more.filter { $0 != ".DS_Store" }.count
+        }
+        return TrashStatus(bytes: bytes, items: items)
     }
 }

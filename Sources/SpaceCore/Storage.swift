@@ -71,6 +71,14 @@ public enum StorageAnalyzer {
             switch name {
             case "Library":
                 for child in ((try? fm.contentsOfDirectory(atPath: path)) ?? []).sorted() where !skippedInLibrary.contains(child) {
+                    if child == "Mobile Documents" {
+                        // iCloud Drive son documentos tuyos; su Papelera (lo borrado de iCloud Drive) cuenta como Papelera.
+                        let mobile = "\(path)/\(child)"
+                        for entry in ((try? fm.contentsOfDirectory(atPath: mobile)) ?? []).sorted() {
+                            jobs.append(("\(mobile)/\(entry)", entry == ".Trash" ? .trash : .personal))
+                        }
+                        continue
+                    }
                     jobs.append(("\(path)/\(child)", developmentInLibrary.contains(child) ? .development : .appData))
                 }
                 let docker = "\(path)/Containers/com.docker.docker"

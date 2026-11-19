@@ -6,6 +6,7 @@ Cada versión publicada en [GitHub Releases](https://github.com/jorgebuitragor/m
 
 - La Papelera aparece en la barra del disco de Inicio con su tamaño y su porcentaje en cuanto tiene algo, y desaparece al vaciarla, sin esperar a volver a medir el disco (necesita acceso total al disco).
 - Con la Papelera vacía, el botón de Inicio dice «Papelera vacía».
+- La Papelera incluye lo borrado de iCloud Drive (que macOS guarda en una Papelera aparte), como la muestra Finder. En la barra del disco, iCloud Drive cuenta como «Documentos y archivos» en vez de «Datos de apps».
 - Limpieza, rehecha para poder revisar:
   - Filtro Todo / Sin riesgo / Para revisar.
   - La lista a la izquierda y un panel de detalle fijo a la derecha: qué es, por qué revisarlo, qué pasa si lo quitas, dónde está (con «Mostrar en Finder»), cómo se quitaría y un botón para incluirlo en el plan.

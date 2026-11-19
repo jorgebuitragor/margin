@@ -9,7 +9,8 @@ final class StorageTests: XCTestCase {
         for (path, size) in [
             ("Documents/informe.pdf", 3_000_000), ("Developer/app/src.bin", 2_000_000), (".gradle/caches/x.bin", 4_000_000),
             ("Library/Caches/app/c.bin", 1_000_000), ("Library/Developer/Xcode/d.bin", 5_000_000), (".Trash/viejo.bin", 1_500_000),
-            ("Applications/Util.app/bin", 500_000)
+            ("Applications/Util.app/bin", 500_000),
+            ("Library/Mobile Documents/com~apple~CloudDocs/notas.txt", 200_000), ("Library/Mobile Documents/.Trash/borrado.txt", 300_000)
         ] {
             let url = home.appendingPathComponent(path)
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -30,8 +31,19 @@ final class StorageTests: XCTestCase {
         XCTAssertEqual(kind("Library/Developer"), .development)
         XCTAssertEqual(kind(".Trash"), .trash)
         XCTAssertEqual(kind("Applications"), .apps)
+        XCTAssertEqual(kind("Library/Mobile Documents/com~apple~CloudDocs"), .personal, "iCloud Drive son documentos")
+        XCTAssertEqual(kind("Library/Mobile Documents/.Trash"), .trash, "Lo borrado de iCloud Drive es Papelera")
+        XCTAssertNil(kind("Library/Mobile Documents"), "iCloud Drive se mide por partes para separar su Papelera")
         XCTAssertNil(kind("Library"), "La Biblioteca se mide por partes, nunca entera")
         XCTAssertFalse(jobs.contains { !$0.path.hasPrefix(home.path) }, "Con una carpeta sintética no se mide el sistema real")
+    }
+
+    func testTrashIncludesICloudDriveTrash() {
+        // Finder muestra juntas la Papelera de la carpeta personal y la de iCloud Drive: Margin cuenta las dos.
+        let trash = TrashStatus.read(DevEnvironment(home: home))
+        XCTAssertEqual(trash.items, 2)
+        XCTAssertGreaterThanOrEqual(trash.bytes ?? 0, 1_800_000)
+        XCTAssertEqual(TrashStatus.paths(DevEnvironment(home: home)).count, 2)
     }
 
     func testMeasuredSegmentsAddUpToTheVolume() throws {
