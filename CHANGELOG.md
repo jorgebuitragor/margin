@@ -2,7 +2,7 @@
 
 Cada versión publicada en [GitHub Releases](https://github.com/jorgebuitragor/margin/releases). Las anteriores a la 0.10 eran solo locales: su detalle está en [PLAN.md](PLAN.md) y [VERIFICACION.md](VERIFICACION.md).
 
-## Sin publicar
+## 0.10.3
 
 - Al vaciar la Papelera, Margin dice exactamente qué se borró («Se borraron para siempre 3 elementos (1,2 GB)»), medido justo antes de vaciarla, y el espacio disponible ahora. Antes solo comparaba el espacio antes y después, que con poco contenido salía igual por el redondeo y que macOS a veces tarda unos segundos en actualizar.
 
