@@ -34,7 +34,22 @@ final class AppModel: ObservableObject {
     @Published var showTabs: [String]?
     /// Pestaña visible. Vive en el modelo para conservarse cuando la interfaz se reconstruye al cambiar el idioma.
     /// MARGIN_TAB abre una pestaña al arrancar (pruebas visuales sin clics).
-    @Published var tab = DevEnvironment.testSetting("TAB") ?? UserDefaults.standard.string(forKey: Pref.startTab) ?? "Inicio"
+    /// «Memoria RAM» se llama «Rendimiento» desde la 0.10: un ajuste o una variable con el nombre antiguo siguen valiendo.
+    @Published var tab = AppModel.currentTabName(DevEnvironment.testSetting("TAB") ?? UserDefaults.standard.string(forKey: Pref.startTab) ?? "Inicio")
+    static func currentTabName(_ name: String) -> String { name == "Memoria RAM" ? "Rendimiento" : name }
+
+    // Rendimiento: CPU entre dos muestras, temperatura, batería y tiempo encendido.
+    @Published var vitals: SystemVitals?
+    private let sampler = VitalsSampler()
+    /// Una muestra de memoria y de CPU fuera del hilo principal (recorrer los procesos tarda unos milisegundos).
+    func refreshPerformance() async {
+        let sampler = sampler
+        let (diagnostics, vitals) = await Task.detached(priority: .utility) { (Diagnostics.read(), sampler.sample()) }.value
+        withAnimation(.smooth) {
+            self.diagnostics = diagnostics
+            self.vitals = vitals
+        }
+    }
     private var cancellation: ScanCancellation?
     private var session = UUID()
 
@@ -260,7 +275,10 @@ final class AppModel: ObservableObject {
         capacity = VolumeCapacity.read(env.home)
         diagnostics = Diagnostics.read()
         guard let storage, let capacity else { return }
-        self.storage = StorageAnalyzer.build(capacity: capacity, measured: Self.measured(storage), partial: Set(storage.segments.filter(\.partial).map(\.kind)), date: storage.date)
+        var measured = Self.measured(storage)
+        // El intercambio cambia de un minuto a otro: se relee en vivo (solo si la medición ya lo separaba de macOS).
+        if measured[.swap] != nil, let swap = StorageAnalyzer.swapFileBytes() { measured[.swap] = swap }
+        self.storage = StorageAnalyzer.build(capacity: capacity, measured: measured, partial: Set(storage.segments.filter(\.partial).map(\.kind)), date: storage.date)
     }
 
     static func measured(_ storage: StorageBreakdown) -> [StorageSegment.Kind: Int64] {

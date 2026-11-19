@@ -26,6 +26,8 @@ enum Preferences {
     static var defaults: UserDefaults { .standard }
 
     static func register() {
+        // La pestaña «Memoria RAM» pasó a llamarse «Rendimiento».
+        if defaults.string(forKey: Pref.startTab) == "Memoria RAM" { defaults.set("Rendimiento", forKey: Pref.startTab) }
         defaults.register(defaults: [
             Pref.language: "sistema", Pref.theme: "sistema", Pref.startTab: "Inicio", Pref.measureOnLaunch: true,
             Pref.smartOnLaunch: false, Pref.inactiveDays: 30, Pref.projectRoots: "", Pref.colorblind: false,
@@ -74,6 +76,7 @@ struct Palette {
         case .appData: return colorblind ? Color(hex: 0xE69F00) : Color(hex: 0xF59E0B)
         case .development: return colorblind ? Color(hex: 0xCC79A7) : Color(hex: 0x8B5CF6)
         case .macOS: return colorblind ? Color(hex: 0xF0E442) : Color(hex: 0xEC4899)
+        case .swap: return colorblind ? Color(hex: 0x882255) : Color(hex: 0xF9A8D4)
         case .trash: return colorblind ? Color(hex: 0xD55E00) : Color(hex: 0xEF4444)
         case .purgeable: return colorblind ? Color(hex: 0x56B4E9) : Color(hex: 0x7DD3FC)
         case .system: return colorblind ? Color(hex: 0x8C8C8C) : Color(hex: 0x6B7280)

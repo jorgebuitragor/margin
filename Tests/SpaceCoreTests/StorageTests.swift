@@ -70,6 +70,20 @@ final class StorageTests: XCTestCase {
         XCTAssertNil(StorageAnalyzer.systemVolumesBytes(total: 1_000, runner: FakeRunner()), "Sin diskutil no se inventa nada")
     }
 
+    func testSwapIsItsOwnSegmentAndDoesNotInflateTheTotal() {
+        // El intercambio va aparte y entre macOS y la Papelera; si lo medido no cabe, se recorta como el resto.
+        let capacity = VolumeCapacity(total: 1_000, available: 400, purgeable: 0)
+        let breakdown = StorageAnalyzer.build(capacity: capacity, measured: [.macOS: 200, .swap: 50, .trash: 10])
+        XCTAssertEqual(breakdown.segments.map(\.kind), [.apps, .personal, .appData, .development, .macOS, .swap, .trash, .purgeable, .system])
+        XCTAssertEqual(breakdown.bytes(.swap), 50)
+        XCTAssertEqual(breakdown.bytes(.system), 340)
+        // Una medición guardada antes de que existiera «swap» se sigue leyendo.
+        let old = #"{"available":1,"date":"2026-11-01T00:00:00Z","total":2,"segments":[{"bytes":1,"kind":"macOS","partial":false}]}"#
+        let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601
+        XCTAssertNoThrow(try decoder.decode(StorageBreakdown.self, from: Data(old.utf8)))
+        XCTAssertNotNil(StorageAnalyzer.swapFileBytes(), "vm.swapusage existe en cualquier Mac")
+    }
+
     func testDataFolderFromTheBriefMargenNameIsKept() throws {
         let legacy = home.appendingPathComponent("Library/Application Support/Margen/planes")
         try FileManager.default.createDirectory(at: legacy, withIntermediateDirectories: true)

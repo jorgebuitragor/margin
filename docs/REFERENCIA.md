@@ -4,7 +4,7 @@ Qué hace cada parte de Margin, qué garantías tiene y cómo se usa desde la te
 
 Hasta la 0.6 se llamaba «Gestor de espacio para Mac» (`Gestor Espacio.app`, comando `espacio`) y durante unas horas de la 0.7, «Margen»; `espacio` y `margen` siguen funcionando como alias.
 
-Estado: versión local 0.9 (2026-11-18). Uso personal; interfaz en español e inglés. Swift + SwiftUI con Liquid Glass; requiere macOS 26 o posterior (validado en macOS 27 / Apple Silicon).
+Estado: versión 0.10.0 (2026-11-18), publicada en GitHub Releases con actualizaciones automáticas. Uso personal; interfaz en español e inglés. Swift + SwiftUI con Liquid Glass; requiere macOS 26 o posterior (validado en macOS 27 / Apple Silicon).
 
 ## Qué incluye
 
@@ -26,7 +26,26 @@ Estado: versión local 0.9 (2026-11-18). Uso personal; interfaz en español e in
 - **Vaciar Papelera** (tarjeta en Inicio, aunque no se haya analizado; menú Margin › Vaciar Papelera…, ⇧⌘⌫ como en Finder; botón en el resultado de un plan que usó la Papelera; o `margin vaciar-papelera`): va aparte de los planes, la hace Finder y pide su propia confirmación, en la que Retorno y Escape cancelan (en la CLI, escribir VACIAR en una terminal interactiva). No la proponen los perfiles ni la expone el MCP, y nunca se ejecuta con una carpeta personal de prueba.
 - **Borrado definitivo** (Ajustes › Borrado definitivo, **apagado por defecto**): los planes de la app borran sin pasar por la Papelera. Activarlo pide confirmación, el riesgo se explica siempre en Ajustes, y mientras está activado lo recuerdan la barra lateral y cada plan («Borrar definitivamente: …»). Las comprobaciones de seguridad son las mismas; si un borrado falla, el archivo se queda donde estaba (no pasa a la Papelera a escondidas). Las apps de /Applications van siempre a la Papelera, porque un borrado a medias por permisos las dejaría rotas. La CLI (`margin apply`) y el servidor MCP nunca borran definitivamente.
 - **Perfiles de desarrollo** (`margin dev`, pestaña Limpieza): SDK de Android, emuladores, simuladores y runtimes de iOS, Xcode, artefactos de proyectos (`node_modules`, `.build`, `build`, `target`, `Pods`…), pnpm/npm/yarn, Gradle y Maven, Docker, Homebrew, versiones de Node (nvm), Claude Desktop y VS Code. Cada elemento trae tamaño, recuperable estimado, causa, coste de regenerarlo y el comando oficial de la herramienta dueña.
-- App nativa con pestañas Inicio, Limpieza, Carpetas (árbol o mapa de áreas), Archivos (con casillas) y Memoria RAM (presión real y apps que más memoria usan); menú «Analizar» con carpetas frecuentes y atajos de teclado; análisis en segundo plano con cancelación.
+- App nativa con pestañas Inicio, Limpieza, Apps, Carpetas (árbol o mapa de áreas), Archivos (con casillas) y Rendimiento; menú «Analizar» con carpetas frecuentes y atajos de teclado; análisis en segundo plano con cancelación.
+- **Rendimiento** (antes «Memoria RAM»), solo lectura:
+  - uso de CPU entre dos muestras (`host_statistics`), con la carga media;
+  - apps que más CPU usan (tiempo de CPU por proceso con `proc_pid_rusage`, agrupado por app);
+  - estado térmico de macOS y tiempo encendido;
+  - batería por IOKit: carga, capacidad máxima frente a la de fábrica y ciclos (no aparece en Macs de escritorio);
+  - lo que ya había: presión de memoria, intercambio, memoria cableada y comprimida, y apps que más memoria usan.
+  Se actualiza cada 3 segundos solo mientras la sección está abierta.
+- **Intercambio (swap)** en la barra del disco: el tamaño de los archivos de intercambio (`vm.swapusage`, total). Se relee en vivo y se descuenta de «macOS», que antes lo incluía.
+- **Permisos** (Ajustes):
+  - acceso total al disco: macOS no deja pedirlo, así que el botón abre el panel;
+  - notificaciones: se piden con el diálogo del sistema;
+  - control de Finder (Automatización), que necesita «Vaciar Papelera»: se pide con `AEDeterminePermissionToAutomateTarget`.
+  Cada uno muestra su estado y se vuelve a comprobar al volver a la app.
+- **Actualizaciones** (Sparkle 2):
+  - lee `appcast.xml` de la última GitHub Release una vez al día;
+  - comprueba la firma EdDSA y que la versión nueva esté firmada con la misma identidad;
+  - sin perfil del sistema (`SUEnableSystemProfiling` apagado);
+  - menú Margin › Buscar actualizaciones… y Ajustes › Actualizaciones (comprobar sola, instalar sin preguntar);
+  - no se activa en modo de prueba ni cuando la app corre como agente de aviso.
 - CLI `margin` con JSON para agentes y `--text` para la terminal, y **servidor MCP** (`margin mcp`) con la skill `liberar-espacio` para Claude Code y Codex.
 
 - **Liberar espacio con confirmación** (`margin plan` + `margin apply`, o «Revisar plan…» / «Mover a la Papelera…» en la app): las únicas escrituras posibles son mover a la Papelera o ejecutar el comando oficial de la herramienta dueña. **Fuera de «Vaciar Papelera» y del ajuste «Borrado definitivo» de la app no hay borrado definitivo**, ni siquiera como alternativa si la Papelera falla.
@@ -67,6 +86,15 @@ Deshacer la integración: `claude mcp remove --scope user margin`, `codex mcp re
 
 Al analizar la carpeta personal, macOS puede pedir permiso para acceder a datos de otras apps (por ejemplo `~/Library/Containers`). Si se deniega, esa carpeta se cuenta como ilegible y el total se marca como mínimo.
 
+## Publicar una versión
+
+```sh
+# 1. Sube VERSION y añade «## <versión>» a CHANGELOG.md. 2. Commit y push de main. 3.
+bash scripts/release.sh
+```
+
+`release.sh` comprueba que main está limpia y subida, compila y firma la app con «Margin Local», firma el ZIP con la clave EdDSA de Sparkle (en el llavero; la pública está en `Resources/sparkle-clave-publica.txt`) y crea la release `v<versión>` con el ZIP y `appcast.xml`. El número de compilación es el número de commits. Todo ocurre en este Mac: ninguna clave sale de él ni se guarda en GitHub. **Si se pierde la clave privada de Sparkle, las copias instaladas no aceptarán más actualizaciones**: conviene guardar una copia (`generate_keys -x archivo`) en un lugar seguro.
+
 ## Instalar
 
 Desde esta carpeta, con Xcode y Swift 6 instalados:
@@ -75,7 +103,7 @@ Desde esta carpeta, con Xcode y Swift 6 instalados:
 bash scripts/install.sh
 ```
 
-Instala `~/Applications/Margin.app` y `~/.local/bin/margin` (con `margen` y `espacio` como alias), sin permisos de administrador. Solo reemplaza una instalación anterior de esta misma app, retira las antiguas `Gestor Espacio.app` y `Margen.app` y conserva planes y registro (la carpeta de datos `GestorEspacio` o `Margen` pasa a llamarse `Margin`). La app se firma con «Margin Local», un certificado propio que solo existe en tu llavero (lo crea una vez `bash scripts/firma-local.sh`; sin él se firma ad hoc). Si macOS pregunta si `codesign` puede usar esa clave, elige «Permitir siempre». Así macOS la reconoce entre versiones y no olvida los permisos que le diste, como el acceso total al disco o las notificaciones. `scripts/build-app.sh` compila sin instalar: deja la app firmada en una carpeta temporal, `dist/Margin.zip` y `dist/margin`. El icono se genera con `swift scripts/make-icon.swift` y se versiona en `Resources/`. Sin App Sandbox ni notarización; los permisos de privacidad de macOS siguen aplicando.
+Instala `~/Applications/Margin.app` y `~/.local/bin/margin`, que es un enlace a la CLI que va dentro de la app (`Contents/Helpers/margin`), así que se actualiza con ella; `margen` y `espacio` siguen como alias. No hacen falta permisos de administrador. Solo reemplaza una instalación anterior de esta misma app, retira las antiguas `Gestor Espacio.app` y `Margen.app` y conserva planes y registro (la carpeta de datos `GestorEspacio` o `Margen` pasa a llamarse `Margin`). La app se firma con «Margin Local», un certificado propio que solo existe en tu llavero (lo crea una vez `bash scripts/firma-local.sh`; sin él se firma ad hoc). Si macOS pregunta si `codesign` puede usar esa clave, elige «Permitir siempre». Así macOS la reconoce entre versiones y no olvida los permisos que le diste, como el acceso total al disco o las notificaciones. `scripts/build-app.sh` compila sin instalar: deja la app firmada en una carpeta temporal, `dist/Margin.zip` y `dist/margin`. Toma la versión de `VERSION`, incluye Sparkle en `Contents/Frameworks` y, si existe la clave pública, la configuración de actualizaciones. El icono se genera con `swift scripts/make-icon.swift` y se versiona en `Resources/`. Sin App Sandbox ni notarización; los permisos de privacidad de macOS siguen aplicando.
 
 La compilación usa una carpeta temporal sin espacios para evitar un fallo de la base de datos de SwiftPM. `--disable-sandbox` afecta al proceso de construcción del paquete, no concede permisos de administrador.
 
@@ -94,7 +122,7 @@ margin dev --inactive-days 60 --roots ~/Developer,~/git
 
 `scan` devuelve `totalAllocated`, `folders` (ruta, profundidad, tamaño, archivos, `protection`: `protected`/`sync`, `partial`), `entries` (archivos más grandes y carpetas protegidas con su total), `syncedBy`, incidencias y las banderas `cancelled`/`limited`. `limited` significa que se listan solo los archivos más grandes (`--max-files`, 20.000 por defecto); los totales siguen completos. Un total con `partial` o con incidencias es un mínimo. En `scan`, `canDelete` siempre es falso: los archivos sueltos se planifican con `margin plan --file`.
 
-Los resultados incluyen rutas y nombres. Al consultarlos desde un asistente pasan a su conversación: comparte solo el alcance que necesites. La app y la CLI no incluyen clientes de red ni un modelo.
+Los resultados incluyen rutas y nombres. Al consultarlos desde un asistente pasan a su conversación: comparte solo el alcance que necesites. La CLI no usa la red. La app solo la usa para consultar si hay una versión nueva (Sparkle, contra GitHub Releases), y eso se puede apagar en Ajustes. Ninguna de las dos incluye un modelo.
 
 ## Pruebas
 

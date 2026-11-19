@@ -9,6 +9,7 @@ extension StorageSegment.Kind {
         case .appData: return t("Datos de apps y cachés")
         case .development: return t("Desarrollo")
         case .macOS: return "macOS"
+        case .swap: return t("Intercambio (swap)")
         case .trash: return t("Papelera")
         case .purgeable: return t("Purgable por macOS")
         case .system: return t("Otros")
@@ -20,7 +21,8 @@ extension StorageSegment.Kind {
         case .personal: return t("Tus carpetas: Documentos, Escritorio, Descargas, Imágenes, iCloud Drive…")
         case .appData: return t("La Biblioteca de tu carpeta personal: datos, configuración y cachés de las apps.")
         case .development: return t("Proyectos, SDK de Android, Xcode y simuladores, Homebrew, cachés de Gradle, npm, pnpm…")
-        case .macOS: return t("El sistema, el arranque y la recuperación, la memoria virtual (intercambio) y los recursos que descarga macOS.")
+        case .macOS: return t("El sistema, el arranque y la recuperación, y los recursos que descarga macOS.")
+        case .swap: return t("Memoria que macOS pasa al disco cuando la RAM no alcanza. No se borra a mano: baja sola al cerrar apps que usan mucha memoria y se vacía al reiniciar. Más detalles en Rendimiento.")
         case .trash: return t("Se libera al vaciar la Papelera.")
         case .purgeable: return t("macOS lo libera por sí mismo cuando hace falta (cachés de iCloud, instantáneas locales…).")
         case .system: return t("Lo que no se puede atribuir: datos de apps que macOS protege (contenedores, Fotos, Mail…), carpetas sin permiso de lectura, otros usuarios, metadatos de APFS…")
@@ -36,6 +38,8 @@ struct DiskBar: View {
     let palette: Palette
     var reduceMotion = false
     var onMeasure: () -> Void = {}
+    /// Clic en el tramo o en la leyenda de la Papelera: pide confirmación para vaciarla.
+    var onEmptyTrash: (() -> Void)? = nil
     /// Las categorías se llenan de izquierda a derecha al aparecer.
     @State private var grown = false
     @State private var hovered: String?
@@ -99,7 +103,8 @@ struct DiskBar: View {
                         .brightness(hovered == piece.id ? 0.12 : 0)
                         .frame(width: widths[index])
                         .onHover { hovered = $0 ? piece.id : (hovered == piece.id ? nil : hovered) }
-                        .help("\(piece.title): \(size(piece.bytes)) (\(percent(piece.bytes, of: total))) · \(piece.detail)")
+                        .onTapGesture { if piece.id == StorageSegment.Kind.trash.rawValue { onEmptyTrash?() } }
+                        .help("\(piece.title): \(size(piece.bytes)) (\(percent(piece.bytes, of: total))) · \(piece.detail)" + (piece.id == StorageSegment.Kind.trash.rawValue && onEmptyTrash != nil ? " " + t("Haz clic para vaciarla.") : ""))
                         .accessibilityElement()
                         .accessibilityLabel("\(piece.title), \(size(piece.bytes)), \(percent(piece.bytes, of: total))")
                 }
@@ -137,6 +142,9 @@ struct DiskBar: View {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(piece.title).font(.callout).lineLimit(2).fixedSize(horizontal: false, vertical: true)
                         Text("\(size(piece.bytes)) · \(percent(piece.bytes, of: total))").font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                        if piece.id == StorageSegment.Kind.trash.rawValue, let onEmptyTrash {
+                            Button(t("Vaciar…"), action: onEmptyTrash).buttonStyle(.link).font(.caption)
+                        }
                     }
                 }
                 .help(piece.detail)

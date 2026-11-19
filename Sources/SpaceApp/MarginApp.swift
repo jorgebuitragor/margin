@@ -5,6 +5,8 @@ import SpaceCore
 @main
 struct MarginApp: App {
     @StateObject private var model = AppModel()
+    /// Se crea después de comprobar si la app se abrió como agente de aviso (en ese modo no se busca nada).
+    @StateObject private var updater: Updater
     @AppStorage(Pref.language) private var language = "sistema"
     @AppStorage(Pref.theme) private var theme = "sistema"
 
@@ -13,11 +15,13 @@ struct MarginApp: App {
         CoreText.isEnglish = Localizer.isEnglish
         // Lanzada por el agente de aviso de poco espacio: comprueba, avisa si hace falta y termina sin abrir ventana.
         if CommandLine.arguments.contains(SpaceAlertAgent.argument) { SpaceAlertAgent.runCheckAndExit() }
+        _updater = StateObject(wrappedValue: Updater())
     }
 
     var body: some Scene {
         WindowGroup("Margin") {
             ContentView(model: model)
+                .environmentObject(updater)
                 // Cambiar el idioma reconstruye toda la interfaz con los textos nuevos.
                 .id(language)
                 .frame(minWidth: 980, minHeight: 650)
@@ -45,6 +49,10 @@ struct MarginApp: App {
         }
         .defaultSize(width: 1180, height: 780)
         .commands {
+            CommandGroup(after: .appInfo) {
+                Button(t("Buscar actualizaciones…")) { updater.checkNow() }
+                    .disabled(!updater.canCheck)
+            }
             CommandGroup(replacing: .appSettings) {
                 Button(t("Ajustes…")) { model.tab = "Ajustes" }.keyboardShortcut(",", modifiers: .command)
             }

@@ -5,7 +5,7 @@ import Foundation
 /// personal entera tarda.
 public struct StorageSegment: Codable, Sendable, Identifiable, Equatable {
     public enum Kind: String, Codable, Sendable, CaseIterable {
-        case apps, personal, appData, development, macOS, trash, purgeable, system
+        case apps, personal, appData, development, macOS, swap, trash, purgeable, system
     }
     public let kind: Kind
     public let bytes: Int64
@@ -101,7 +101,10 @@ public enum StorageAnalyzer {
         // Los volúmenes de macOS (sistema, arranque, recuperación, memoria virtual) comparten el espacio del disco
         // con tus datos: los informa diskutil, sin recorrerlos.
         if !list.isEmpty, list.contains(where: { $0.kind == .macOS }), let system = systemVolumesBytes(total: capacity.total, runner: env.runner) {
-            bytes[.macOS, default: 0] += system
+            // El intercambio vive en el volumen VM: se muestra aparte y se descuenta de «macOS» para no contarlo dos veces.
+            let swap = swapFileBytes() ?? 0
+            bytes[.macOS, default: 0] += max(0, system - swap)
+            bytes[.swap] = swap
         }
         for (index, job) in list.enumerated() {
             let usage = box.results[index] ?? Usage()
@@ -115,7 +118,7 @@ public enum StorageAnalyzer {
     /// (clones de APFS, enlaces duros entre carpetas), se recorta proporcionalmente para no pasar del total.
     public static func build(capacity: VolumeCapacity, measured: [StorageSegment.Kind: Int64], partial: Set<StorageSegment.Kind> = [], date: Date = Date()) -> StorageBreakdown {
         let used = max(0, capacity.total - capacity.available)
-        let order: [StorageSegment.Kind] = [.apps, .personal, .appData, .development, .macOS, .trash]
+        let order: [StorageSegment.Kind] = [.apps, .personal, .appData, .development, .macOS, .swap, .trash]
         var values = order.map { max(0, measured[$0] ?? 0) }
         var purgeable = min(capacity.purgeable, used)
         let sum = values.reduce(0, +) + purgeable
@@ -129,6 +132,15 @@ public enum StorageAnalyzer {
         segments.append(StorageSegment(kind: .purgeable, bytes: purgeable))
         segments.append(StorageSegment(kind: .system, bytes: system))
         return StorageBreakdown(date: date, total: capacity.total, available: capacity.available, segments: segments)
+    }
+
+    /// Lo que ocupan en el disco los archivos de intercambio (swap): el total reservado según `vm.swapusage`, que crece
+    /// cuando la RAM no alcanza y vuelve a bajar al bajar la presión de memoria o al reiniciar.
+    public static func swapFileBytes() -> Int64? {
+        var swap = xsw_usage()
+        var size = MemoryLayout<xsw_usage>.size
+        guard sysctlbyname("vm.swapusage", &swap, &size, nil, 0) == 0 else { return nil }
+        return Int64(swap.xsu_total)
     }
 
     /// Espacio de los volúmenes de macOS del mismo contenedor APFS que tus datos (todo menos el volumen «Data»),

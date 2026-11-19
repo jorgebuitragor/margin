@@ -35,7 +35,7 @@ struct ContentView: View {
     var reduceMotion: Bool { reduceMotionSetting || systemReduceMotion }
 
     static let tabs: [(id: String, icon: String)] = [
-        ("Inicio", "sparkles"), ("Limpieza", "hammer"), ("Apps", "square.grid.2x2"), ("Carpetas", "folder"), ("Archivos", "doc"), ("Memoria RAM", "memorychip")
+        ("Inicio", "sparkles"), ("Limpieza", "hammer"), ("Apps", "square.grid.2x2"), ("Carpetas", "folder"), ("Archivos", "doc"), ("Rendimiento", "gauge.with.dots.needle.67percent")
     ]
     /// Contador por pestaña para animar solo el icono de la pestaña recién elegida.
     @State var bounces: [String: Int] = [:]
@@ -51,6 +51,14 @@ struct ContentView: View {
         .transaction { if reduceMotion { $0.animation = nil; $0.disablesAnimations = true } }
         .symbolEffectsRemoved(reduceMotion)
         .onChange(of: model.tab) { bounces[model.tab, default: 0] += 1 }
+        // Rendimiento se actualiza solo mientras está a la vista (la CPU se mide entre una muestra y la siguiente).
+        .task(id: model.tab) {
+            guard model.tab == "Rendimiento" else { return }
+            while !Task.isCancelled {
+                await model.refreshPerformance()
+                try? await Task.sleep(for: .seconds(3))
+            }
+        }
         // Al volver a Margin (quizá tras vaciar la Papelera en Finder) se relee su tamaño.
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in model.refreshTrash() }
         // Un análisis nuevo (u otra carpeta) invalida la navegación del mapa y la selección: los elementos marcados
@@ -126,7 +134,7 @@ struct ContentView: View {
                 }
                 Label(t("Nada sin tu confirmación"), systemImage: "checkmark.shield.fill")
                     .font(.callout.weight(.medium)).foregroundStyle(accent)
-                Text(t("Versión %@", "0.9")).font(.caption2).foregroundStyle(.tertiary)
+                Text(t("Versión %@", Updater.version)).font(.caption2).foregroundStyle(.tertiary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 18).padding(.vertical, 14)
@@ -172,6 +180,13 @@ struct ContentView: View {
     @ToolbarContentBuilder
     var toolbarContent: some ToolbarContent {
         if tab == "Inicio" {
+            // La Papelera, siempre a la vista en Inicio: con su tamaño cuando macOS deja leerlo.
+            ToolbarItem {
+                Button(model.trash?.bytes.map { t("Vaciar Papelera (%@)…", size($0)) } ?? t("Vaciar Papelera…"), systemImage: "trash") { model.askEmptyTrash() }
+                    .labelStyle(.titleAndIcon)
+                    .disabled(model.emptying || model.trash?.items == 0)
+                    .help(model.trash?.items == 0 ? t("La Papelera está vacía.") : t("Vacía la Papelera para siempre, con confirmación."))
+            }
             ToolbarItem {
                 Button(t("Volver a medir el disco"), systemImage: "arrow.clockwise") { model.measureStorage() }
                     .symbolEffect(.rotate, isActive: model.storageProgress != nil)
@@ -238,9 +253,10 @@ struct ContentView: View {
                     .buttonStyle(.glassProminent).tint(accent)
             }
         }
-        if tab == "Memoria RAM" {
+        if tab == "Rendimiento" {
             ToolbarItem {
-                Button(t("Actualizar"), systemImage: "arrow.clockwise") { withAnimation(.smooth) { model.diagnostics = Diagnostics.read() } }
+                Button(t("Actualizar"), systemImage: "arrow.clockwise") { Task { await model.refreshPerformance() } }
+                    .help(t("Se actualiza solo cada 3 segundos mientras esta sección está abierta."))
             }
         }
     }

@@ -370,3 +370,22 @@ Hechas con clics sobre una carpeta personal sintética, sin ejecutar ningún pla
   - `MARGIN_CAPTURAS=1` oculta la etiqueta «Modo de prueba».
 - Las capturas se hicieron con otra instancia (`open -n --env … --args -tema claro|oscuro -idioma es -ApplePersistenceIgnoreState YES`). Los argumentos no cambian los ajustes guardados: después siguen sin `tema`, `analisisAlAbrir` ni `borradoDefinitivo`, e `idioma` sigue en `es`. La Margin de Jorge se volvió a abrir normal.
 - La herramienta de capturas dibuja un cursor donde hizo el último clic. Para que no salga, antes de cada captura se hace un desplazamiento nulo en la esquina de la ventana.
+
+## 0.10.0: Papelera a mano, swap, Permisos, Rendimiento y actualizaciones (18-11-2026)
+
+- **Pruebas**: 82, todas bien.
+  - El intercambio va aparte, entre macOS y la Papelera, se recorta igual que el resto y una medición guardada antes de que existiera se sigue leyendo.
+  - Dos muestras de rendimiento dan un uso de CPU entre 0 y 1, la carga media, el tiempo encendido y las apps que más CPU usan.
+  - En este Mac (sin batería), macOS expone el servicio de batería vacío; se trata como «sin batería» y la tarjeta no aparece.
+- **App, con clics**:
+  - Inicio tiene «Vaciar Papelera…» en la barra de herramientas.
+  - Tras volver a medir, la barra muestra «Intercambio (swap) 7,52 GB»; «macOS» bajó de 55,9 a 48,4 GB porque antes lo incluía.
+  - Rendimiento muestra CPU (98 % durante la medición del disco), temperatura «Normal», «4 horas» encendido, la memoria de siempre y «Apps que más CPU usan» (Margin 167 % mientras medía).
+  - Ajustes › Permisos: acceso total al disco «No concedido», notificaciones «Sin pedir» (con «Permitir…») y control de Finder «Concedido».
+  - Ajustes › Actualizaciones: comprobación automática activada y la última comprobación a los pocos segundos de abrir.
+- **Sparkle 2.10.1**:
+  - Va en `Contents/Frameworks`, con la firma de sus autores. La app y la CLI (`Contents/Helpers/margin`) se firman con «Margin Local» y `codesign --verify --deep --strict` pasa.
+  - `~/.local/bin/margin` es un enlace a la CLI de la app y `margin status` funciona.
+  - La clave EdDSA se creó con `generate_keys` y quedó en el llavero; la pública está en `Resources/sparkle-clave-publica.txt`.
+  - El paquete de Swift ya trae `generate_keys` y `sign_update`. La descarga de Sparkle tardó casi una hora por la red, y la release oficial no respondía.
+- **Licencia**: GPL-3.0. `LICENSE` es el texto oficial de la FSF (SHA-256 `3972dc97…`, el de gnu.org).

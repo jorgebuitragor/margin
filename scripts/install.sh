@@ -1,6 +1,7 @@
 #!/bin/bash
 # Compila e instala para el usuario actual, sin permisos de administrador:
-#   ~/Applications/Margin.app  y  ~/.local/bin/margin (con `margen` y `espacio` como alias de los nombres anteriores)
+#   ~/Applications/Margin.app  y  ~/.local/bin/margin, un enlace a la CLI que va dentro de la app (con `margen` y
+#   `espacio` como alias de los nombres anteriores)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 bash scripts/build-app.sh
@@ -16,7 +17,9 @@ if [ -d "$app_dst" ]; then
 fi
 ditto "$app_src" "$app_dst"
 codesign --verify --deep --strict "$app_dst"
-install -m 0755 dist/margin "$bin_dst"
+# La CLI vive dentro de la app: el enlace hace que cada actualización de la app también la actualice.
+rm -f "$bin_dst"
+ln -s "$app_dst/Contents/Helpers/margin" "$bin_dst"
 # Nombres anteriores: «Gestor Espacio» (hasta la 0.6) y «Margen» (0.7). Se retiran sus apps y sus comandos quedan
 # como alias de `margin`.
 for pair in "Gestor Espacio.app|local.gestorespacio.mac" "Margen.app|local.margen.mac"; do

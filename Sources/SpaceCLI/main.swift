@@ -141,7 +141,7 @@ do {
         guard let breakdown = StorageAnalyzer.measure(env) else { fail("No se pudo leer la capacidad del volumen.") }
         StorageAnalyzer.save(breakdown, env)
         if args.contains("--text") {
-            let names: [StorageSegment.Kind: String] = [.apps: "Apps", .personal: "Documentos y archivos", .appData: "Datos de apps y cachés", .development: "Desarrollo", .macOS: "macOS", .trash: "Papelera", .purgeable: "Purgable por macOS", .system: "Otros"]
+            let names: [StorageSegment.Kind: String] = [.apps: "Apps", .personal: "Documentos y archivos", .appData: "Datos de apps y cachés", .development: "Desarrollo", .macOS: "macOS", .swap: "Intercambio (swap)", .trash: "Papelera", .purgeable: "Purgable por macOS", .system: "Otros"]
             print("Disco: \(size(breakdown.total)) · usado \(size(breakdown.used)) · disponible \(size(breakdown.available))")
             for segment in breakdown.segments {
                 let pct = Double(segment.bytes) / Double(max(breakdown.total, 1)) * 100

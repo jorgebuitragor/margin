@@ -13,7 +13,8 @@ extension ContentView {
     ]
 
     var diskCard: some View {
-        DiskBar(capacity: model.capacity, storage: model.storage, progress: model.storageProgress, palette: palette, reduceMotion: reduceMotion) { model.measureStorage() }
+        DiskBar(capacity: model.capacity, storage: model.storage, progress: model.storageProgress, palette: palette, reduceMotion: reduceMotion,
+                onMeasure: { model.measureStorage() }, onEmptyTrash: { model.askEmptyTrash() })
             .padding(20)
             .surface(cornerRadius: 22, highContrast: highContrast)
     }

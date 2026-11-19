@@ -5,6 +5,7 @@ import SpaceCore
 /// Ajustes: general, análisis, apariencia, idioma, accesibilidad y datos. Todo se guarda al momento.
 struct SettingsPane: View {
     @ObservedObject var model: AppModel
+    @EnvironmentObject var updater: Updater
     @AppStorage(Pref.startTab) var startTab = "Inicio"
     @AppStorage(Pref.measureOnLaunch) var measureOnLaunch = true
     @AppStorage(Pref.smartOnLaunch) var smartOnLaunch = false
@@ -20,7 +21,6 @@ struct SettingsPane: View {
     @AppStorage(Pref.permanentDelete) var permanentDelete = false
     @State var confirmPermanent = false
     @State var alertError: String?
-    @State var hasFullDiskAccess = TrashStatus.read(appEnvironment()).bytes != nil
     let palette: Palette
 
     var roots: [String] {
@@ -155,24 +155,15 @@ struct SettingsPane: View {
                     Button(t("Volver a medir el disco")) { model.measureStorage() }.disabled(model.storageProgress != nil)
                 }
                 Text(t("Guarda los planes, el registro de acciones y la última medición del disco. No guarda el contenido de tus archivos.")).font(.caption).foregroundStyle(.secondary)
-                LabeledContent(t("Acceso total al disco")) {
-                    HStack {
-                        Label(hasFullDiskAccess ? t("Concedido") : t("No concedido"), systemImage: hasFullDiskAccess ? "checkmark.circle.fill" : "exclamationmark.circle")
-                            .foregroundStyle(hasFullDiskAccess ? palette.accent : .secondary)
-                        if !hasFullDiskAccess { Button(t("Abrir Ajustes del Sistema…")) { openFullDiskAccessSettings() } }
-                    }
-                }
-                Text(t("Opcional. Sin él Margin no puede leer el tamaño de la Papelera ni las copias del iPhone; con él también mide carpetas protegidas de otras apps. Vaciar la Papelera no lo necesita.")).font(.caption).foregroundStyle(.secondary)
             }
+            PermissionsSection(palette: palette)
+            UpdatesSection(updater: updater)
             Section(t("Acerca de")) {
-                LabeledContent("Margin", value: t("Versión %@", "0.9"))
+                LabeledContent("Margin", value: t("Versión %@", Updater.version))
                 Text(t("Mide tu disco y te ayuda a liberar espacio sin sorpresas: nada se borra sin tu confirmación.")).font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            hasFullDiskAccess = TrashStatus.read(appEnvironment()).bytes != nil
-        }
         .scrollContentBackground(.hidden)
         .scrollEdgeEffectStyle(.soft, for: .top)
         .padding(.horizontal, 12)

@@ -267,9 +267,34 @@ extension ContentView {
 
     var memory: some View {
         let d = model.diagnostics
+        let v = model.vitals
         let pressureColor: Color = d.pressureLevel == 4 ? palette.danger : d.pressureLevel == 2 ? palette.warning : accent
+        let cpuColor: Color = (v?.cpuLoad ?? 0) > 0.85 ? palette.warning : accent
+        let thermalColor: Color = v?.thermal == .critical ? palette.danger : v?.thermal == .serious ? palette.warning : accent
         return ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                // Procesador, temperatura y tiempo encendido.
+                HStack(spacing: 14) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label(t("Uso de CPU"), systemImage: "cpu").font(.caption).foregroundStyle(.secondary)
+                        Text(v?.cpuLoad.map { "\(Int(($0 * 100).rounded())) %" } ?? t("Midiendo…")).font(.title2.weight(.semibold)).monospacedDigit()
+                            .foregroundStyle(cpuColor).contentTransition(.numericText())
+                        MemoryBar(fraction: v?.cpuLoad ?? 0, color: cpuColor, delay: 0, reduceMotion: reduceMotion).frame(height: 6)
+                    }.frame(maxWidth: .infinity, alignment: .leading).padding(18)
+                        .surface(tint: cpuColor.opacity(highContrast ? 0.3 : 0.12), highContrast: highContrast)
+                        .help(t("Uso total de los %@ núcleos en los últimos segundos. Carga media (1, 5 y 15 min): %@.", "\(v?.cpuCount ?? 0)", v?.loadAverage.map { String(format: "%.1f", $0) }.joined(separator: " · ") ?? "—"))
+                        .accessibilityElement(children: .combine)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label(t("Temperatura"), systemImage: "thermometer.medium").font(.caption).foregroundStyle(.secondary)
+                        Text(v.map { thermalTitle($0.thermal) } ?? "—").font(.title2.weight(.semibold)).foregroundStyle(thermalColor)
+                    }.frame(maxWidth: .infinity, alignment: .leading).padding(18)
+                        .surface(tint: thermalColor.opacity(highContrast ? 0.3 : 0.12), highContrast: highContrast)
+                        .help(t("El estado térmico que informa macOS. Si es «Elevado» o «Crítico», el Mac reduce la velocidad para enfriarse."))
+                        .accessibilityElement(children: .combine)
+                    metric(t("Encendido desde hace"), v?.uptime.map(uptimeText) ?? "—", "power")
+                }
+                if let battery = v?.battery { batteryCard(battery) }
+                Text(t("Memoria")).font(.headline).padding(.top, 4)
                 HStack(spacing: 14) {
                     VStack(alignment: .leading, spacing: 10) {
                         Label(t("Presión de memoria"), systemImage: "gauge.with.dots.needle.67percent").font(.caption).foregroundStyle(.secondary)
@@ -302,11 +327,33 @@ extension ContentView {
                 }
                 .padding(18).frame(maxWidth: .infinity, alignment: .leading)
                 .surface(cornerRadius: 20, highContrast: highContrast)
+                if let top = v?.topCPU, !top.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(t("Apps que más CPU usan")).font(.headline)
+                        VStack(alignment: .leading, spacing: 8) {
+                            let maxPercent = max(top.first?.percent ?? 1, 1)
+                            ForEach(Array(top.enumerated()), id: \.element.id) { index, app in
+                                HStack(spacing: 10) {
+                                    Text(app.name).lineLimit(1).frame(width: 220, alignment: .leading)
+                                    MemoryBar(fraction: app.percent / maxPercent, color: app.percent >= 90 ? palette.warning : accent, delay: Double(index) * 0.03, reduceMotion: reduceMotion)
+                                    Text("\(Int(app.percent.rounded())) %").monospacedDigit().frame(width: 90, alignment: .trailing)
+                                    Text(tn(app.processes, "proceso", "procesos")).font(.caption).foregroundStyle(.secondary).frame(width: 90, alignment: .trailing)
+                                }.accessibilityElement(children: .combine)
+                            }
+                            Text(t("Porcentaje de un núcleo en los últimos segundos, sumando los procesos de cada app: 100 % es un núcleo entero, y una app puede pasar de 100 % si usa varios."))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(18).frame(maxWidth: .infinity, alignment: .leading)
+                    .surface(cornerRadius: 20, highContrast: highContrast)
+                }
                 VStack(alignment: .leading, spacing: 10) {
                     Text(t("Cómo interpretar estos datos")).font(.headline)
                     VStack(alignment: .leading, spacing: 10) {
                         Text(t("La presión es la señal que usa macOS: «Normal» significa que hay memoria suficiente aunque parezca casi toda ocupada; «Advertencia», que comprime y usa disco a menudo; «Crítica», que falta memoria y el Mac puede ir lento."))
                         Text(t("Si la presión no es normal, cerrar las apps de la lista que no estés usando es lo que más ayuda. Esta app no cierra procesos ni «libera RAM»: eso no acelera el Mac."))
+                        Text(t("El intercambio es memoria que macOS guarda en el disco cuando la RAM no alcanza: ocupa espacio (aparece en la barra del disco de Inicio) y baja solo al cerrar apps o al reiniciar."))
+                        Text(t("Una CPU alta durante mucho rato, con la temperatura «Elevada», suele venir de una app concreta de la lista: cerrarla o esperar a que termine devuelve la velocidad."))
                         Button(t("Abrir Monitor de Actividad"), systemImage: "waveform.path.ecg") {
                             NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Activity Monitor.app"))
                         }.buttonStyle(.glass)
@@ -321,6 +368,34 @@ extension ContentView {
             .padding(.horizontal, 28).padding(.top, 12).padding(.bottom, 20)
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
+    }
+}
+
+extension ContentView {
+    func thermalTitle(_ thermal: SystemVitals.Thermal) -> String {
+        switch thermal {
+        case .nominal: return t("Normal")
+        case .fair: return t("Templado")
+        case .serious: return t("Elevado")
+        case .critical: return t("Crítico")
+        }
+    }
+
+    func uptimeText(_ seconds: TimeInterval) -> String {
+        let hours = Int(seconds / 3600)
+        if hours >= 24 { return t("%@ y %@", tn(hours / 24, "día", "días"), tn(hours % 24, "hora", "horas")) }
+        if hours >= 1 { return tn(hours, "hora", "horas") }
+        return tn(max(1, Int(seconds / 60)), "minuto", "minutos")
+    }
+
+    func batteryCard(_ battery: Battery) -> some View {
+        let healthColor: Color = (battery.health ?? 100) < 80 ? palette.warning : accent
+        return HStack(spacing: 14) {
+            metric(t("Batería"), battery.charge.map { "\($0) %" } ?? "—", battery.isCharging ? "battery.100percent.bolt" : battery.onPower ? "powerplug" : "battery.75percent")
+            metric(t("Capacidad máxima"), battery.health.map { "\($0) %" } ?? "—", "heart", tint: healthColor)
+            metric(t("Ciclos de carga"), battery.cycleCount.map { "\($0)" } ?? "—", "arrow.triangle.2.circlepath")
+        }
+        .help(t("Capacidad máxima: lo que la batería guarda hoy frente a cuando era nueva. Por debajo de 80 %, macOS suele recomendar revisarla."))
     }
 }
 
