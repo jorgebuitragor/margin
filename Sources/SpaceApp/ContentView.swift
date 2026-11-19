@@ -82,9 +82,7 @@ struct ContentView: View {
         .alert(model.emptyResult?.status == .done ? t("Papelera vaciada") : t("No se pudo vaciar la Papelera"), isPresented: Binding(get: { model.emptyResult != nil }, set: { if !$0 { model.emptyResult = nil } })) {
             Button(t("Aceptar"), role: .cancel) {}
         } message: {
-            if let result = model.emptyResult {
-                Text(t(result.message) + " " + t("Espacio disponible: antes %@, después %@.", size(result.availableBefore), size(result.availableAfter)))
-            }
+            if let result = model.emptyResult { Text(emptyTrashSummary(result)) }
         }
         .sheet(item: Binding(get: { model.applyReport.map { ReportBox(report: $0) } }, set: { if $0 == nil { model.applyReport = nil } })) { box in results(box.report) }
         .alert(t("No se pudo preparar el plan"), isPresented: Binding(get: { model.planError != nil }, set: { if !$0 { model.planError = nil } })) {
@@ -385,6 +383,25 @@ struct ContentView: View {
         .hoverLift(!reduceMotion)
         .accessibilityElement(children: .contain)
     }
+}
+
+/// Resumen tras vaciar la Papelera: lo borrado (medido justo antes) y el espacio disponible ahora.
+func emptyTrashSummary(_ result: TrashEmptier.Result) -> String {
+    guard result.status == .done else { return t(result.message) }
+    var parts: [String] = []
+    if let items = result.trashItems, let bytes = result.trashBytes {
+        parts.append(t("Se borraron para siempre %@ (%@).", tn(items, "elemento", "elementos"), size(bytes)))
+    } else {
+        parts.append(t(result.message))
+    }
+    if let after = result.availableAfter {
+        let freed = result.freedObserved.map { $0 > 0 ? " (+\(formatBytes($0)))" : "" } ?? ""
+        parts.append(t("Espacio disponible ahora: %@%@.", size(after), freed))
+        if let bytes = result.trashBytes, bytes >= 50_000_000, (result.freedObserved ?? 0) < bytes / 2 {
+            parts.append(t("macOS puede tardar unos segundos en contar el espacio liberado."))
+        }
+    }
+    return parts.joined(separator: " ")
 }
 
 /// Carpeta personal que se muestra como «~»: la de prueba si hay MARGIN_HOME, para no enseñar rutas reales.

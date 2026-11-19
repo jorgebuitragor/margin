@@ -243,6 +243,9 @@ do {
         print("\(result.status == .done ? "✓" : "✗") \(result.message)")
         if result.status == .blocked { exit(1) }
         if result.status != .done, let output = result.output { print(output) }
+        if result.status == .done, let items = result.trashItems, let bytes = result.trashBytes {
+            print("Se borraron para siempre \(items) \(items == 1 ? "elemento" : "elementos") (\(size(bytes))).")
+        }
         print("Espacio disponible: antes \(size(result.availableBefore)), después \(size(result.availableAfter))\(result.freedObserved.map { " (\($0 >= 0 ? "+" : "")\(formatBytes($0)))" } ?? "").")
     case "mcp":
         // Servidor MCP por stdio. Nada se escribe en stdout salvo respuestas JSON-RPC.

@@ -85,6 +85,8 @@ final class SmartScanTests: XCTestCase {
         let done = TrashEmptier.empty(env: env, executor: executor)
         XCTAssertEqual(executor.commands, [["osascript", "-e", "tell application \"Finder\" to empty trash"]])
         XCTAssertEqual(done.status, .done)
+        XCTAssertEqual(done.trashItems, 2, "Lo que había justo antes de vaciar")
+        XCTAssertGreaterThan(done.trashBytes ?? 0, 1_000_000)
         let log = try String(contentsOfFile: "\(env.supportDirectory)/acciones.jsonl", encoding: .utf8)
         XCTAssertTrue(log.contains("vaciar-papelera"))
         executor.commandStatus = 1

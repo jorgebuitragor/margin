@@ -462,3 +462,12 @@ Hechas con clics sobre una carpeta personal sintética, sin ejecutar ningún pla
   - mostró el aviso del cask.
 - **Hallazgo**: Homebrew marca la app con cuarentena. Gatekeeper la rechaza (no está notarizada) y **mata la CLI con SIGKILL (código 137)** sin ningún mensaje, hasta que el usuario la apruebe o quite la cuarentena. La app pediría clic derecho › Abrir; el comando falla en silencio.
 - `brew uninstall --cask margin` la retiró limpiamente (app y enlace). La Margin de Jorge en `~/Applications` y su `~/.local/bin/margin`, que va primero en el PATH, no se vieron afectadas; Margin se volvió a abrir.
+
+## Resultado de vaciar la Papelera (18-11-2026)
+
+- **Problema**: Jorge vació la Papelera (8 KB de iCloud Drive) y el aviso decía «antes 12,59 GB, después 12,59 GB». La cifra estaba redondeada y no decía qué se había borrado.
+- **Ahora**:
+  - `TrashEmptier` mide la Papelera justo antes de vaciarla (`trashBytes`, `trashItems`, también en el registro). Si APFS aún no refleja al menos la mitad de lo borrado, vuelve a medir el disponible durante un máximo de 3 s.
+  - El aviso dice «Se borraron para siempre N elementos (X). Espacio disponible ahora: Y (+Z).» y, si se borraron más de 50 MB que todavía no se notan, que macOS puede tardar unos segundos. La CLI muestra lo mismo.
+  - Prueba ampliada: el resultado trae lo que había (83 pruebas, todas bien).
+- No se probó vaciando de verdad: la Papelera real no se vacía en pruebas, y con una carpeta de prueba el vaciado se bloquea.
