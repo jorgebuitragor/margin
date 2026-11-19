@@ -448,3 +448,7 @@ Hechas con clics sobre una carpeta personal sintética, sin ejecutar ningún pla
 - **Arreglo**: `TrashStatus` suma las dos papeleras, y la medición del disco separa iCloud Drive (documentos) de su Papelera.
   - Prueba nueva: 83 en total, todas bien.
   - En la app, la tarjeta pasó a «8 KB · 1 elemento» y el botón, a «Vaciar Papelera (8 KB)…»; la leyenda muestra la Papelera. No se vació nada.
+- **Release `v0.10.2`**:
+  - Publicada con ZIP, `appcast.xml` y `Margin.dmg`. El cask quedó en 0.10.2, con el SHA-256 del `.dmg`, y el enlace directo lleva a la v0.10.2.
+  - Las notas de Sparkle muestran los subpuntos anidados.
+  - La copia de Jorge (compilación 40) se actualizó a la 42 y volvió a abrirse con la misma firma.
