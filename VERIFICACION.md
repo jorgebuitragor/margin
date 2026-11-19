@@ -452,3 +452,13 @@ Hechas con clics sobre una carpeta personal sintética, sin ejecutar ningún pla
   - Publicada con ZIP, `appcast.xml` y `Margin.dmg`. El cask quedó en 0.10.2, con el SHA-256 del `.dmg`, y el enlace directo lleva a la v0.10.2.
   - Las notas de Sparkle muestran los subpuntos anidados.
   - La copia de Jorge (compilación 40) se actualizó a la 42 y volvió a abrirse con la misma firma.
+
+## Instalación con Homebrew (18-11-2026)
+
+- Con el permiso de Jorge, `brew trust jorgebuitragor/tap`.
+- `brew audit` no corre: Homebrew exige actualizar las Command Line Tools a las de Xcode 27, y eso necesita `sudo`.
+- `brew install --cask jorgebuitragor/tap/margin` funcionó:
+  - instaló `/Applications/Margin.app` (0.10.2, compilación 42, firma «Margin Local» válida) y enlazó `/opt/homebrew/bin/margin`;
+  - mostró el aviso del cask.
+- **Hallazgo**: Homebrew marca la app con cuarentena. Gatekeeper la rechaza (no está notarizada) y **mata la CLI con SIGKILL (código 137)** sin ningún mensaje, hasta que el usuario la apruebe o quite la cuarentena. La app pediría clic derecho › Abrir; el comando falla en silencio.
+- `brew uninstall --cask margin` la retiró limpiamente (app y enlace). La Margin de Jorge en `~/Applications` y su `~/.local/bin/margin`, que va primero en el PATH, no se vieron afectadas; Margin se volvió a abrir.
