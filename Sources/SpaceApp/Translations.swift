@@ -289,7 +289,7 @@ let english: [String: String] = [
     "Permisos": "Permissions",
     "Permitir…": "Allow…",
     "Porcentaje de un núcleo en los últimos segundos, sumando los procesos de cada app: 100 % es un núcleo entero, y una app puede pasar de 100 % si usa varios.": "Percent of one core over the last few seconds, adding up each app's processes: 100% is a whole core, and an app can go over 100% if it uses several.",
-    "Se actualiza solo cada 3 segundos mientras esta sección está abierta.": "Updates by itself every 3 seconds while this section is open.",
+    "Se actualiza solo cada 5 segundos mientras esta sección está abierta.": "Updates by itself every 5 seconds while this section is open.",
     "Sin pedir": "Not requested",
     "Temperatura": "Temperature",
     "Templado": "Warm",

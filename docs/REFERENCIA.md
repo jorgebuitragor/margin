@@ -33,7 +33,7 @@ Estado: versión 0.10.0 (2026-11-18), publicada en GitHub Releases con actualiza
   - estado térmico de macOS y tiempo encendido;
   - batería por IOKit: carga, capacidad máxima frente a la de fábrica y ciclos (no aparece en Macs de escritorio);
   - lo que ya había: presión de memoria, intercambio, memoria cableada y comprimida, y apps que más memoria usan.
-  Se actualiza cada 3 segundos solo mientras la sección está abierta.
+  Se actualiza cada 5 segundos solo mientras la sección está abierta, sin animar cada muestra y con un solo recorrido de procesos para memoria y CPU (unos 2–5 % de un núcleo; antes de optimizarlo, 14–23 %).
 - **Intercambio (swap)** en la barra del disco: el tamaño de los archivos de intercambio (`vm.swapusage`, total). Se relee en vivo y se descuenta de «macOS», que antes lo incluía.
 - **Permisos** (Ajustes):
   - acceso total al disco: macOS no deja pedirlo, así que el botón abre el panel;
@@ -93,7 +93,7 @@ Al analizar la carpeta personal, macOS puede pedir permiso para acceder a datos 
 bash scripts/release.sh
 ```
 
-`release.sh` comprueba que main está limpia y subida, compila y firma la app con «Margin Local», firma el ZIP con la clave EdDSA de Sparkle (en el llavero; la pública está en `Resources/sparkle-clave-publica.txt`) y crea la release `v<versión>` con el ZIP y `appcast.xml` (para las actualizaciones) y `Margin.dmg` (para descargarla a mano; `scripts/make-dmg.sh`, firmado con «Margin Local»). Como el `.dmg` tiene nombre fijo, `…/releases/latest/download/Margin.dmg` es siempre la última versión. El número de compilación es el número de commits. Todo ocurre en este Mac: ninguna clave sale de él ni se guarda en GitHub. **Si se pierde la clave privada de Sparkle, las copias instaladas no aceptarán más actualizaciones**: conviene guardar una copia (`generate_keys -x archivo`) en un lugar seguro.
+`release.sh` comprueba que main está limpia y subida, compila y firma la app con «Margin Local», firma el ZIP con la clave EdDSA de Sparkle (en el llavero; la pública está en `Resources/sparkle-clave-publica.txt`) y crea la release `v<versión>` con el ZIP y `appcast.xml` (para las actualizaciones) y `Margin.dmg` (para descargarla a mano; `scripts/make-dmg.sh`, firmado con «Margin Local»). Como el `.dmg` tiene nombre fijo, `…/releases/latest/download/Margin.dmg` es siempre la última versión. Al final, el script actualiza el cask `margin` del tap [jorgebuitragor/homebrew-tap](https://github.com/jorgebuitragor/homebrew-tap) con la versión y el SHA-256 del `.dmg`. El cask tiene `auto_updates true` (de las actualizaciones se encarga Sparkle), enlaza la CLI como `margin` y su `zap` borra los datos, las preferencias y el agente de aviso. El número de compilación es el número de commits. Todo ocurre en este Mac: ninguna clave sale de él ni se guarda en GitHub. **Si se pierde la clave privada de Sparkle, las copias instaladas no aceptarán más actualizaciones**: conviene guardar una copia (`generate_keys -x archivo`) en un lugar seguro.
 
 ## Instalar
 

@@ -73,6 +73,15 @@ El mapa de **Carpetas** muestra cada carpeta en proporción a lo que ocupa; con 
 
 **Descarga [Margin.dmg](https://github.com/jorgebuitragor/margin/releases/latest/download/Margin.dmg)** (siempre la última versión), ábrelo y arrastra Margin a Aplicaciones. Como no está notarizada por Apple, la primera vez ábrela con clic derecho › Abrir y confirma. Después se actualiza sola. Todas las versiones están en [Releases](https://github.com/jorgebuitragor/margin/releases). Para usar `margin` en la terminal: `ln -s /Applications/Margin.app/Contents/Helpers/margin ~/.local/bin/margin`.
 
+**Con Homebrew**, desde el tap propio (Homebrew pide confiar en un tap que no es oficial antes de usarlo; Margin no está en el repositorio oficial porque exige apps notarizadas por Apple):
+
+```bash
+brew trust jorgebuitragor/tap
+brew install --cask jorgebuitragor/tap/margin
+```
+
+Instala Margin en Aplicaciones y el comando `margin`. Las actualizaciones las hace la propia app, así que `brew upgrade` no la toca.
+
 **O compílala** con Xcode y Swift 6 instalados, desde la carpeta del proyecto:
 
 ```bash

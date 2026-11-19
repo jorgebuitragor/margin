@@ -56,7 +56,7 @@ struct ContentView: View {
             guard model.tab == "Rendimiento" else { return }
             while !Task.isCancelled {
                 await model.refreshPerformance()
-                try? await Task.sleep(for: .seconds(3))
+                try? await Task.sleep(for: .seconds(5))
             }
         }
         // Al volver a Margin (quizá tras vaciar la Papelera en Finder) se relee su tamaño.
@@ -256,7 +256,7 @@ struct ContentView: View {
         if tab == "Rendimiento" {
             ToolbarItem {
                 Button(t("Actualizar"), systemImage: "arrow.clockwise") { Task { await model.refreshPerformance() } }
-                    .help(t("Se actualiza solo cada 3 segundos mientras esta sección está abierta."))
+                    .help(t("Se actualiza solo cada 5 segundos mientras esta sección está abierta."))
             }
         }
     }

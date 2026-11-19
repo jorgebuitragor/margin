@@ -18,6 +18,10 @@ public struct SystemVitals: Sendable {
     public var battery: Battery?
     /// Apps que más CPU usan entre las dos muestras (100 % = un núcleo entero).
     public var topCPU: [AppCPU]
+    /// Apps que más memoria usan, del mismo recorrido de procesos que la CPU.
+    public var topMemory: [AppMemory] = []
+    /// Procesos que macOS no deja inspeccionar sin privilegios.
+    public var hiddenProcesses = 0
 
     public enum Thermal: Int, Sendable {
         case nominal, fair, serious, critical
@@ -56,7 +60,11 @@ public struct Battery: Sendable {
 public final class VitalsSampler: @unchecked Sendable {
     private var lastTicks: (busy: UInt64, total: UInt64)?
     private var lastProcesses: [pid_t: UInt64] = [:]
+    /// Dueño (la .app o el nombre) de cada proceso: no cambia mientras el proceso vive, así que se guarda.
+    private var owners: [pid_t: String] = [:]
     private var lastDate: Date?
+    /// La batería cambia despacio y leerla de IOKit no es gratis: se relee como mucho una vez por minuto.
+    private var battery: (value: Battery?, date: Date)?
     private let timebase: mach_timebase_info_data_t = {
         var info = mach_timebase_info_data_t()
         mach_timebase_info(&info)
@@ -73,14 +81,22 @@ public final class VitalsSampler: @unchecked Sendable {
             load = Double(ticks.busy - last.busy) / Double(ticks.total - last.total)
         }
         lastTicks = ticks
-        let processes = processTimes()
+        let (processes, memory, hidden) = processUsage()
+        var memoryTotals: [String: (bytes: UInt64, count: Int)] = [:]
+        for (pid, bytes) in memory {
+            let key = owner(pid)
+            memoryTotals[key, default: (0, 0)].bytes += bytes
+            memoryTotals[key, default: (0, 0)].count += 1
+        }
+        let topMemory = memoryTotals.map { AppMemory(name: $0.key, bytes: $0.value.bytes, processes: $0.value.count) }
+            .sorted { $0.bytes > $1.bytes }.prefix(12)
         var top: [AppCPU] = []
         if let lastDate {
             let wall = now.timeIntervalSince(lastDate) * 1_000_000_000
             var totals: [String: (ns: Double, count: Int)] = [:]
             for (pid, cpu) in processes {
                 guard let before = lastProcesses[pid], cpu >= before, wall > 0 else { continue }
-                let key = AppMemory.owner(pid)
+                let key = owner(pid)
                 totals[key, default: (0, 0)].ns += Double(cpu - before)
                 totals[key, default: (0, 0)].count += 1
             }
@@ -91,11 +107,26 @@ public final class VitalsSampler: @unchecked Sendable {
         }
         lastProcesses = processes
         lastDate = now
+        owners = owners.filter { processes[$0.key] != nil }
         var averages = [Double](repeating: 0, count: 3)
         let gotAverages = getloadavg(&averages, 3) == 3
         return SystemVitals(cpuLoad: load, cpuCount: ProcessInfo.processInfo.activeProcessorCount,
                             loadAverage: gotAverages ? averages : [], thermal: .init(ProcessInfo.processInfo.thermalState),
-                            uptime: Self.uptime(), battery: Self.battery(), topCPU: top)
+                            uptime: Self.uptime(), battery: cachedBattery(now), topCPU: top, topMemory: Array(topMemory), hiddenProcesses: hidden)
+    }
+
+    private func cachedBattery(_ now: Date) -> Battery? {
+        if let battery, now.timeIntervalSince(battery.date) < 60 { return battery.value }
+        let value = Self.battery()
+        battery = (value, now)
+        return value
+    }
+
+    private func owner(_ pid: pid_t) -> String {
+        if let known = owners[pid] { return known }
+        let name = AppMemory.owner(pid)
+        owners[pid] = name
+        return name
     }
 
     /// Tics de CPU acumulados de todos los núcleos: ocupados (usuario, sistema, nice) y totales.
@@ -112,24 +143,28 @@ public final class VitalsSampler: @unchecked Sendable {
         return (user + system + nice, user + system + idle + nice)
     }
 
-    /// Tiempo de CPU acumulado por proceso, en nanosegundos (los que macOS deja inspeccionar).
-    func processTimes() -> [pid_t: UInt64] {
+    /// Un solo recorrido de procesos: tiempo de CPU acumulado (nanosegundos) y huella de memoria de cada uno, y cuántos
+    /// no se dejan inspeccionar.
+    func processUsage() -> (cpu: [pid_t: UInt64], memory: [pid_t: UInt64], hidden: Int) {
         let capacity = Int(proc_listallpids(nil, 0)) * 2
-        guard capacity > 0 else { return [:] }
+        guard capacity > 0 else { return ([:], [:], 0) }
         var pids = [pid_t](repeating: 0, count: capacity)
         let count = pids.withUnsafeMutableBufferPointer { proc_listallpids($0.baseAddress, Int32($0.count * MemoryLayout<pid_t>.size)) }
         var times: [pid_t: UInt64] = [:]
+        var memory: [pid_t: UInt64] = [:]
+        var hidden = 0
         for pid in pids.prefix(Int(max(count, 0))) where pid > 0 {
             var info = rusage_info_v4()
             let status = withUnsafeMutablePointer(to: &info) {
                 $0.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { proc_pid_rusage(pid, RUSAGE_INFO_V4, $0) }
             }
-            guard status == 0 else { continue }
+            guard status == 0 else { hidden += 1; continue }
             // En Apple Silicon los tiempos vienen en unidades de mach_absolute_time: se pasan a nanosegundos.
             let ticks = info.ri_user_time + info.ri_system_time
             times[pid] = ticks * UInt64(timebase.numer) / UInt64(max(timebase.denom, 1))
+            memory[pid] = info.ri_phys_footprint
         }
-        return times
+        return (times, memory, hidden)
     }
 
     static func uptime() -> TimeInterval? {

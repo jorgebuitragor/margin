@@ -9,7 +9,8 @@
 # en el llavero (la crea este script la primera vez y guarda la pública en Resources/sparkle-clave-publica.txt).
 # Ninguna clave sale del Mac ni se guarda en GitHub. La release lleva el ZIP de la app y appcast.xml, que es lo que
 # lee Sparkle en https://github.com/jorgebuitragor/margin/releases/latest/download/appcast.xml, y Margin.dmg para
-# descargarla a mano (…/releases/latest/download/Margin.dmg).
+# descargarla a mano (…/releases/latest/download/Margin.dmg). Al final actualiza el cask de Homebrew en
+# jorgebuitragor/homebrew-tap (versión y SHA-256 del .dmg).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 repo="jorgebuitragor/margin"
@@ -66,4 +67,12 @@ cat > dist/appcast.xml <<XML
 </rss>
 XML
 gh release create "$tag" -R "$repo" --title "Margin $version" --notes "$notes" --target main "$zip" dist/appcast.xml dist/Margin.dmg
-echo "Publicada $tag. Las copias instaladas la verán en su próxima comprobación (o con Margin › Buscar actualizaciones…)."
+# Homebrew: el cask del tap (jorgebuitragor/homebrew-tap) pasa a esta versión y al checksum del nuevo .dmg.
+tap="$(mktemp -d)"
+git clone -q "https://github.com/jorgebuitragor/homebrew-tap.git" "$tap"
+sha="$(shasum -a 256 dist/Margin.dmg | cut -d' ' -f1)"
+sed -i '' -E "s/^  version \".*\"/  version \"$version\"/; s/^  sha256 \".*\"/  sha256 \"$sha\"/" "$tap/Casks/margin.rb"
+git -C "$tap" commit -qam "Margin $version"
+git -C "$tap" push -q
+rm -rf "$tap"
+echo "Publicada $tag y actualizado el cask de Homebrew. Las copias instaladas la verán en su próxima comprobación (o con Margin › Buscar actualizaciones…)."

@@ -27,7 +27,9 @@ public struct Diagnostics: Codable, Sendable {
         }
     }
 
-    public static func read() -> Diagnostics {
+    /// `includeApps: false` omite la memoria por app (recorrer todos los procesos): Rendimiento la obtiene del mismo
+    /// recorrido que mide la CPU (`VitalsSampler`), para no recorrerlos dos veces cada pocos segundos.
+    public static func read(includeApps: Bool = true) -> Diagnostics {
         var errors: [String] = []
         var vm = vm_statistics64_data_t()
         var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64_data_t>.size / MemoryLayout<integer_t>.size)
@@ -57,7 +59,7 @@ public struct Diagnostics: Codable, Sendable {
         var levelSize = MemoryLayout<Int32>.size
         let pressureLevel = sysctlbyname("kern.memorystatus_vm_pressure_level", &level, &levelSize, nil, 0) == 0 ? Int(level) : nil
         if pressureLevel == nil { errors.append(loc("Presión de memoria no disponible.", "Memory pressure not available.")) }
-        let (apps, hidden) = AppMemory.top(limit: 12)
+        let (apps, hidden) = includeApps ? AppMemory.top(limit: 12) : ([], 0)
         var diagnostics = Diagnostics(date: Date(), physicalMemory: ProcessInfo.processInfo.physicalMemory,
                            wiredMemory: valid ? UInt64(vm.wire_count) * UInt64(pageSize) : nil,
                            compressedMemory: valid ? UInt64(vm.compressor_page_count) * UInt64(pageSize) : nil,

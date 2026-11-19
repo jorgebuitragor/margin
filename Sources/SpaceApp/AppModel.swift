@@ -44,8 +44,14 @@ final class AppModel: ObservableObject {
     /// Una muestra de memoria y de CPU fuera del hilo principal (recorrer los procesos tarda unos milisegundos).
     func refreshPerformance() async {
         let sampler = sampler
-        let (diagnostics, vitals) = await Task.detached(priority: .utility) { (Diagnostics.read(), sampler.sample()) }.value
-        withAnimation(.smooth) {
+        let (read, vitals) = await Task.detached(priority: .utility) { (Diagnostics.read(includeApps: false), sampler.sample()) }.value
+        var diagnostics = read
+        diagnostics.apps = vitals.topMemory
+        diagnostics.hiddenProcesses = vitals.hiddenProcesses
+        // Sin animación: redibujar las tarjetas de cristal y animar ~20 barras cada 3 s costaba el 15–20 % de un núcleo.
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
             self.diagnostics = diagnostics
             self.vitals = vitals
         }

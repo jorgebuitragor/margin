@@ -3,14 +3,26 @@ import Foundation
 /// Idioma de la interfaz. El texto fuente está en español y sirve de clave; `english` tiene la traducción.
 /// Se cambia en caliente desde Ajustes (la vista raíz se reconstruye al cambiar el ajuste).
 enum Localizer {
-    static var isEnglish: Bool {
-        switch UserDefaults.standard.string(forKey: Pref.language) ?? "sistema" {
+    /// Se calcula una vez y se recalcula con `refresh()` al cambiar el idioma. Leerlo de UserDefaults en cada `t()`
+    /// (cientos por dibujo) era lo que más CPU gastaba al actualizar Rendimiento.
+    nonisolated(unsafe) private(set) static var isEnglish = computeIsEnglish()
+    nonisolated(unsafe) private(set) static var locale = Locale(identifier: isEnglish ? "en_US" : "es_ES")
+
+    /// `language` es el valor del ajuste si ya se conoce (al dibujar); si no, se lee de UserDefaults.
+    static func refresh(_ language: String? = nil) {
+        let english = computeIsEnglish(language)
+        guard english != isEnglish || language == nil else { return }
+        isEnglish = english
+        locale = Locale(identifier: english ? "en_US" : "es_ES")
+    }
+
+    private static func computeIsEnglish(_ language: String? = nil) -> Bool {
+        switch language ?? UserDefaults.standard.string(forKey: Pref.language) ?? "sistema" {
         case "es": return false
         case "en": return true
         default: return !(Locale.preferredLanguages.first ?? "es").hasPrefix("es")
         }
     }
-    static var locale: Locale { Locale(identifier: isEnglish ? "en_US" : "es_ES") }
 }
 
 /// Traduce un texto de la interfaz. Con argumentos, el texto es un formato con `%@`.

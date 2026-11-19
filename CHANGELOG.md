@@ -2,6 +2,13 @@
 
 Cada versión publicada en [GitHub Releases](https://github.com/jorgebuitragor/margin/releases). Las anteriores a la 0.10 eran solo locales: su detalle está en [PLAN.md](PLAN.md) y [VERIFICACION.md](VERIFICACION.md).
 
+## 0.10.1
+
+- Rendimiento gasta mucha menos CPU mientras está abierta: un solo recorrido de procesos para memoria y CPU, sin animar cada actualización, cada 5 segundos y con el idioma de la interfaz en memoria en vez de leerlo en cada texto (antes, 14–23 % de un núcleo).
+- Se puede instalar con Homebrew: `brew trust jorgebuitragor/tap` y `brew install --cask jorgebuitragor/tap/margin`.
+- Descarga directa en `.dmg` desde el README.
+- El servidor MCP informa la versión real de Margin.
+
 ## 0.10.0
 
 - Actualizaciones automáticas: Margin busca versiones nuevas en GitHub una vez al día y las instala con tu permiso. Margin › Buscar actualizaciones… lo hace en el momento, y en Ajustes › Actualizaciones se puede elegir que se instalen sin preguntar.

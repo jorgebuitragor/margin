@@ -12,6 +12,7 @@ struct MarginApp: App {
 
     init() {
         Preferences.register()
+        Localizer.refresh()
         CoreText.isEnglish = Localizer.isEnglish
         // Lanzada por el agente de aviso de poco espacio: comprueba, avisa si hace falta y termina sin abrir ventana.
         if CommandLine.arguments.contains(SpaceAlertAgent.argument) { SpaceAlertAgent.runCheckAndExit() }
@@ -20,6 +21,8 @@ struct MarginApp: App {
 
     var body: some Scene {
         WindowGroup("Margin") {
+            // El idioma se actualiza antes de construir la interfaz: así un cambio de idioma se ve al momento.
+            let _ = Localizer.refresh(language)
             ContentView(model: model)
                 .environmentObject(updater)
                 // Cambiar el idioma reconstruye toda la interfaz con los textos nuevos.
@@ -43,6 +46,7 @@ struct MarginApp: App {
                 .onChange(of: language) {
                     // Las explicaciones del análisis se generan en el idioma elegido: se rehace el análisis inteligente
                     // (unos 8 s) para que también cambien. Los análisis de carpetas se traducen al repetirlos.
+                    Localizer.refresh()
                     CoreText.isEnglish = Localizer.isEnglish
                     if model.dev != nil, !model.devBusy { model.analyzeDev() }
                 }

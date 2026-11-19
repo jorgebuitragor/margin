@@ -414,7 +414,6 @@ struct MemoryBar: View {
             }
         }
         .frame(height: 8)
-        .animation(.smooth(duration: 0.5), value: fraction)
         .onAppear { if reduceMotion { shown = true } else { withAnimation(.spring(response: 0.7, dampingFraction: 0.85).delay(0.1 + delay)) { shown = true } } }
         .accessibilityHidden(true)
     }
