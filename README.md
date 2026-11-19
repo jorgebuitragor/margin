@@ -10,7 +10,11 @@
 </p>
 
 <p align="center">
-  macOS 26 o posterior · Español e inglés · <a href="https://github.com/jorgebuitragor/margin/releases/latest">Descargar la última versión</a> · Licencia GPL-3.0
+  <a href="https://github.com/jorgebuitragor/margin/releases/latest/download/Margin.dmg"><strong>⬇︎ Descargar Margin (.dmg)</strong></a>
+</p>
+
+<p align="center">
+  macOS 26 o posterior · Español e inglés · <a href="CHANGELOG.md">Novedades</a> · Licencia GPL-3.0
 </p>
 
 <picture>
@@ -67,7 +71,7 @@ El mapa de **Carpetas** muestra cada carpeta en proporción a lo que ocupa; con 
 
 ## Instalar
 
-**Descarga** `Margin-<versión>.zip` de la [última versión](https://github.com/jorgebuitragor/margin/releases/latest), descomprímela y mueve Margin a Aplicaciones. Como no está notarizada por Apple, la primera vez ábrela con clic derecho › Abrir. Después se actualiza sola. Para usar `margin` en la terminal: `ln -s /Applications/Margin.app/Contents/Helpers/margin ~/.local/bin/margin`.
+**Descarga [Margin.dmg](https://github.com/jorgebuitragor/margin/releases/latest/download/Margin.dmg)** (siempre la última versión), ábrelo y arrastra Margin a Aplicaciones. Como no está notarizada por Apple, la primera vez ábrela con clic derecho › Abrir y confirma. Después se actualiza sola. Todas las versiones están en [Releases](https://github.com/jorgebuitragor/margin/releases). Para usar `margin` en la terminal: `ln -s /Applications/Margin.app/Contents/Helpers/margin ~/.local/bin/margin`.
 
 **O compílala** con Xcode y Swift 6 instalados, desde la carpeta del proyecto:
 

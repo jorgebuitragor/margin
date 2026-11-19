@@ -394,3 +394,8 @@ Hechas con clics sobre una carpeta personal sintética, sin ejecutar ningún pla
   - Descargado desde la URL del feed (`releases/latest/download/appcast.xml`), el ZIP coincide con su firma EdDSA (`sign_update --verify`) y la app de dentro está firmada con «Margin Local» (compilación 32).
   - La copia instalada (compilación 31), con Margin › Buscar actualizaciones…, mostró «Margin 0.10.0 (32) está disponible (tienes la 0.10.0 (31))» con las notas del CHANGELOG. «Instalar actualización» → «Lista para instalarse» → «Instalar y volver a abrir».
   - Margin volvió a abrirse como compilación 32, con el mismo requisito designado (macOS conserva los permisos), sin marca de cuarentena, y `~/.local/bin/margin` sigue funcionando a través del enlace.
+- **Descarga directa (.dmg)**:
+  - `scripts/make-dmg.sh` crea `Margin.dmg` con Margin.app y un enlace a /Applications, firmado con «Margin Local».
+  - Para la v0.10.0 se hizo a partir de la app del ZIP publicado (compilación 32), no de una compilación nueva. Montado: contiene Margin.app (firma válida) y Applications.
+  - Se subió a la release, y `https://github.com/jorgebuitragor/margin/releases/latest/download/Margin.dmg` descarga ese mismo archivo, byte a byte (4.055.148 bytes).
+  - `release.sh` lo crea y lo sube en cada versión.

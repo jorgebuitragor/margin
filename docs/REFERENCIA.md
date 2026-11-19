@@ -93,7 +93,7 @@ Al analizar la carpeta personal, macOS puede pedir permiso para acceder a datos 
 bash scripts/release.sh
 ```
 
-`release.sh` comprueba que main está limpia y subida, compila y firma la app con «Margin Local», firma el ZIP con la clave EdDSA de Sparkle (en el llavero; la pública está en `Resources/sparkle-clave-publica.txt`) y crea la release `v<versión>` con el ZIP y `appcast.xml`. El número de compilación es el número de commits. Todo ocurre en este Mac: ninguna clave sale de él ni se guarda en GitHub. **Si se pierde la clave privada de Sparkle, las copias instaladas no aceptarán más actualizaciones**: conviene guardar una copia (`generate_keys -x archivo`) en un lugar seguro.
+`release.sh` comprueba que main está limpia y subida, compila y firma la app con «Margin Local», firma el ZIP con la clave EdDSA de Sparkle (en el llavero; la pública está en `Resources/sparkle-clave-publica.txt`) y crea la release `v<versión>` con el ZIP y `appcast.xml` (para las actualizaciones) y `Margin.dmg` (para descargarla a mano; `scripts/make-dmg.sh`, firmado con «Margin Local»). Como el `.dmg` tiene nombre fijo, `…/releases/latest/download/Margin.dmg` es siempre la última versión. El número de compilación es el número de commits. Todo ocurre en este Mac: ninguna clave sale de él ni se guarda en GitHub. **Si se pierde la clave privada de Sparkle, las copias instaladas no aceptarán más actualizaciones**: conviene guardar una copia (`generate_keys -x archivo`) en un lugar seguro.
 
 ## Instalar
 

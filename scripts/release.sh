@@ -8,7 +8,8 @@
 # Todo pasa en este Mac: la app se firma con «Margin Local» y la actualización con la clave EdDSA de Sparkle, que vive
 # en el llavero (la crea este script la primera vez y guarda la pública en Resources/sparkle-clave-publica.txt).
 # Ninguna clave sale del Mac ni se guarda en GitHub. La release lleva el ZIP de la app y appcast.xml, que es lo que
-# lee Sparkle en https://github.com/jorgebuitragor/margin/releases/latest/download/appcast.xml.
+# lee Sparkle en https://github.com/jorgebuitragor/margin/releases/latest/download/appcast.xml, y Margin.dmg para
+# descargarla a mano (…/releases/latest/download/Margin.dmg).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 repo="jorgebuitragor/margin"
@@ -41,6 +42,8 @@ fi
 bash scripts/build-app.sh
 zip="dist/Margin-$version.zip"
 mv dist/Margin.zip "$zip"
+# Para descargar e instalar a mano: nombre fijo, así …/releases/latest/download/Margin.dmg es siempre la última.
+bash scripts/make-dmg.sh "${TMPDIR:-/tmp}/margin-local/Margin.app" dist/Margin.dmg
 signature="$("$tools/bin/sign_update" "$zip")"   # sparkle:edSignature="…" length="…"
 build="$(git rev-list --count HEAD)"
 html="$(printf '%s\n' "$notes" | sed -E 's/^- (.*)$/<li>\1<\/li>/' | grep '<li>' || true)"
@@ -62,5 +65,5 @@ cat > dist/appcast.xml <<XML
   </channel>
 </rss>
 XML
-gh release create "$tag" -R "$repo" --title "Margin $version" --notes "$notes" --target main "$zip" dist/appcast.xml
+gh release create "$tag" -R "$repo" --title "Margin $version" --notes "$notes" --target main "$zip" dist/appcast.xml dist/Margin.dmg
 echo "Publicada $tag. Las copias instaladas la verán en su próxima comprobación (o con Margin › Buscar actualizaciones…)."
