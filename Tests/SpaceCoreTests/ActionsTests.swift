@@ -237,11 +237,25 @@ final class ActionsTests: XCTestCase {
         try file("Library/Developer/Xcode/DerivedData/App/Build/x", 2_000_000)
         let quiet = env()
         let plan = try Planner.plan(devItems: [try item(quiet, "DerivedData")], env: quiet)
-        let busy = env(FakeRunner(["pgrep -f Xcode.app": "123"]))
+        let busy = env(FakeRunner(["ps -axww": "  123 /Applications/Xcode.app/Contents/MacOS/Xcode -psn_0_1\n  456 /bin/zsh -l"]))
         let report = try Planner.apply(plan, env: busy, executor: executor)
         XCTAssertEqual(report.results.first?.status, .blocked)
         XCTAssertTrue(report.results.first?.message.contains("Xcode") == true)
         XCTAssertTrue(executor.trashed.isEmpty)
+    }
+
+    /// `pgrep` no ve a sus antecesores: con `margin apply` en la terminal de Claude, Claude parecía cerrada.
+    func testRunningCheckSeesTheAppMarginRunsInside() throws {
+        let parent = try XCTUnwrap(ProcessRunner().run("/bin/ps", ["-o", "args=", "-p", "\(getppid())"], timeout: 10)?.output
+            .trimmingCharacters(in: .whitespacesAndNewlines).split(separator: " ").first.map(String.init))
+        let real = DevEnvironment(home: home, projectRoots: [], runner: ProcessRunner())
+        XCTAssertTrue(real.isRunning(ProcessCheck(label: "padre", pattern: parent)), "El proceso que lanzó las pruebas está abierto")
+        XCTAssertFalse(real.isRunning(ProcessCheck(label: "nada", pattern: "Inexistente-\(UUID().uuidString).app/Contents/MacOS/")),
+                       "La propia consulta no cuenta como proceso abierto")
+        let quiet = env(FakeRunner(["ps -axww": "  1 /sbin/launchd\n  99 /bin/zsh"]))
+        XCTAssertFalse(quiet.isRunning(.claude))
+        let busy = env(FakeRunner(["ps -axww": "  1 /sbin/launchd\n  22206 /Applications/Claude.app/Contents/MacOS/Claude"]))
+        XCTAssertTrue(busy.isRunning(.claude))
     }
 
     func testCommandRunsOfficialArgumentsWithoutShell() throws {

@@ -226,14 +226,23 @@ public struct DevEnvironment: Sendable {
         }
     }
 
-    /// Hay un proceso cuya línea de comandos contiene el patrón (consulta de solo lectura con pgrep).
+    /// Hay un proceso cuya línea de comandos contiene el patrón (consulta de solo lectura con ps).
+    /// No se usa `pgrep`: excluye a sus antecesores, y Margin suele correr dentro de la app que hay que cerrar
+    /// (`margin apply` en la terminal de Claude o de VS Code, o el MCP lanzado por Claude), que así parecía cerrada.
+    /// `pgrep -a` los incluye, pero también a sí mismo, porque su propia línea de comandos lleva el patrón.
     public func isRunning(_ check: ProcessCheck) -> Bool {
         if let bundle = check.bundleID, let lsappinfo = tool("lsappinfo", extra: ["/usr/bin"]) {
             let out = runner.run(lsappinfo, ["find", "bundleid=\(bundle)"], timeout: 10)
             return out?.status == 0 && !(out?.output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
         }
-        guard let pgrep = tool("pgrep", extra: ["/usr/bin"]) else { return false }
-        return runner.run(pgrep, ["-f", check.pattern], timeout: 10)?.status == 0
+        guard let ps = tool("ps", extra: ["/bin"]), let out = runner.run(ps, ["-axww", "-o", "pid=,args="], timeout: 10), out.status == 0
+        else { return false }
+        let me = ProcessInfo.processInfo.processIdentifier
+        return out.output.split(separator: "\n").contains { line in
+            let fields = line.drop { $0 == " " }.split(separator: " ", maxSplits: 1)
+            guard fields.count == 2, let pid = Int32(fields[0]), pid != me else { return false }
+            return fields[1].contains(check.pattern)
+        }
     }
 
     /// Ruta real (sin enlaces ni el atajo /tmp → /private/tmp), la misma forma que exige la revalidación.

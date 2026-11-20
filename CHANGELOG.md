@@ -2,6 +2,10 @@
 
 Cada versión publicada en [GitHub Releases](https://github.com/jorgebuitragor/margin/releases). Las anteriores a la 0.10 eran solo locales: su detalle está en [PLAN.md](PLAN.md) y [VERIFICACION.md](VERIFICACION.md).
 
+## 0.10.6
+
+- Margin detecta la app abierta aunque se ejecute dentro de ella. Con `margin apply` en la terminal de Claude o de VS Code, o desde el servidor MCP que lanza Claude, esa app parecía cerrada: el plan habría movido la caché de Claude a la Papelera con Claude en marcha. Ahora ese paso queda bloqueado hasta que la cierres.
+
 ## 0.10.5
 
 - El tamaño de una carpeta con clones es el espacio real: las copias idénticas cuentan una sola vez en el árbol de Carpetas, en el total de la carpeta analizada y en la barra del disco. En la 0.10.4 solo «libera ≥ X» lo tenía en cuenta, y la carpeta de WhatsApp seguía marcando 131 GB.

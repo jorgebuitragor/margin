@@ -1,12 +1,12 @@
 import Foundation
 
-/// Proceso que debe estar cerrado antes de actuar (se comprueba con `pgrep -f patrón`).
+/// Proceso que debe estar cerrado antes de actuar (se busca el patrón en la línea de comandos de cada proceso, con `ps`).
 /// Dos comprobaciones son iguales si buscan el mismo proceso: el nombre visible depende del idioma.
 public struct ProcessCheck: Codable, Sendable, Equatable {
     public static func == (a: ProcessCheck, b: ProcessCheck) -> Bool { a.pattern == b.pattern && a.bundleID == b.bundleID }
     public let label: String
     public let pattern: String
-    /// Si se indica, se comprueba la app por su identificador (`lsappinfo find bundleid=…`) en lugar de `pgrep`.
+    /// Si se indica, se comprueba la app por su identificador (`lsappinfo find bundleid=…`) en lugar de `ps`.
     public var bundleID: String? = nil
     public static let xcode = ProcessCheck(label: "Xcode", pattern: "Xcode.app/Contents/MacOS/Xcode")
     public static let simulator = ProcessCheck(label: "Simulator", pattern: "Simulator.app/Contents/MacOS/Simulator")
